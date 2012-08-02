@@ -5,7 +5,6 @@
 #include <QtGui>
 #include <typeinfo>
 #include <andyk/core/core_fwd.h>
-#include <andyk/serialization/serialization.h>
 
 #include "detail.h"
 //#include "deform_model.h"
@@ -18,45 +17,44 @@
 // -----------------------------------------------------------------------------------------------------------
 // DeformApp
 // -----------------------------------------------------------------------------------------------------------
+class DeformApp;
+template<class T> QMap<QString, QSharedPointer<T> >& deform_collection(DeformApp* app)
+{
+    throw ErrorBase::create(QString("Cannot find '%1' collection").arg(typeid(T).name()));
+    static QMap<QString, QSharedPointer<T> > null;
+    return null;
+}
+
 class DeformApp : public QApplication, public XmlParser {
 Q_OBJECT
     // helpers
 private:
+    template<class T> friend QMap<QString, QSharedPointer<T> >& deform_collection(DeformApp* app);
     static QDialog* findDialog(QWidget* pWidget);
-    friend class boost::serialization::access;
 
-    std::map<std::string, boost::shared_ptr<Material> > m_materials;
-    std::map<std::string, boost::shared_ptr<Detail> > m_details;
-    std::map<std::string, boost::shared_ptr<Process> > m_processes;
-    std::map<std::string, boost::shared_ptr<Criterion> > m_criteria;
+    QMap<QString, QSharedPointer<Material> >  m_materials;
+    QMap<QString, QSharedPointer<Detail> >    m_details;
+    QMap<QString, QSharedPointer<Process> >   m_processes;
+    QMap<QString, QSharedPointer<Criterion> > m_criteria;
+    QMap<QString, QSharedPointer<Curve> >     m_curves;
+    QMap<QString, QSharedPointer<Plots> >     m_collsPlots;
+    QMap<QString, QSharedPointer<Plot> >      m_plots;
+    QMap<QString, QSharedPointer<Layouts> >   m_collsLayouts;
+    QMap<QString, QSharedPointer<Layout> >    m_layouts;
 
 //    SavingReportModel m_model;
 //    SavingCostPlot m_costPlot;
 //    SavingPowerPlot m_powerPlot;
 //    SavingReportWeb m_reportWeb;
 
-    template<class Archive>
-    void serialize(Archive &ar, const unsigned int /*version*/)
-    {
-        ar & make_nvp("materials", m_materials);
-        ar & make_nvp("details", m_details);
-        ar & make_nvp("processes", m_processes);
-        ar & make_nvp("criteria", m_criteria);
-    }
-
 public:
     DeformApp(int& argc, char** argv);
     ~DeformApp();
 
-    std::map<std::string, boost::shared_ptr<Material> >& materials() { return m_materials; }
-    std::map<std::string, boost::shared_ptr<Detail> >& details() { return m_details; }
-    std::map<std::string, boost::shared_ptr<Process> >& processes() { return m_processes; }
-    std::map<std::string, boost::shared_ptr<Criterion> >& criteria() { return m_criteria; }
+    template<class T> QMap<QString, QSharedPointer<T> >& collection() { return deform_collection<T>(this); }
+    template<class T> QSharedPointer<T> element(QString name);
+    template<class T> void addCollection(QString nodeName);
 
-    template<class T> std::map<std::string, boost::shared_ptr<T> >& collection();
-    template<class T> boost::shared_ptr<T> element(std::string name);
-
-    template<class T> void xmlAddCollection(QString nodeName);
     virtual void xmlParse(const XmlManager& manager);
 
     virtual bool notify(QObject* receiver, QEvent* event);
@@ -64,61 +62,69 @@ public:
 };
 
 // -----------------------------------------------------------------------------------------------------------
-template<class T> inline std::map<std::string, boost::shared_ptr<T> >& deform_collection(DeformApp*) {
-    throw ErrorBase::create(QString("Cannot find '%1' collection").arg(typeid(T).name()));
-    static std::map<std::string, boost::shared_ptr<T> > null;
-    return null;
+template<> inline QMap<QString, QSharedPointer<Material> >& deform_collection<Material>(DeformApp* app) {
+    return app->m_materials;
 }
-template<> inline std::map<std::string, boost::shared_ptr<Material> >& deform_collection<Material>(DeformApp* app) {
-    return app->materials();
+template<> inline QMap<QString, QSharedPointer<Detail> >& deform_collection<Detail>(DeformApp* app) {
+    return app->m_details;
 }
-template<> inline std::map<std::string, boost::shared_ptr<Detail> >& deform_collection<Detail>(DeformApp* app) {
-    return app->details();
+template<> inline QMap<QString, QSharedPointer<Process> >& deform_collection<Process>(DeformApp* app) {
+    return app->m_processes;
 }
-template<> inline std::map<std::string, boost::shared_ptr<Process> >& deform_collection<Process>(DeformApp* app) {
-    return app->processes();
+template<> inline QMap<QString, QSharedPointer<Criterion> >& deform_collection<Criterion>(DeformApp* app) {
+    return app->m_criteria;
 }
-template<> inline std::map<std::string, boost::shared_ptr<Criterion> >& deform_collection<Criterion>(DeformApp* app) {
-    return app->criteria();
+template<> inline QMap<QString, QSharedPointer<Curve> >& deform_collection<Curve>(DeformApp* app) {
+    return app->m_curves;
 }
-template<class T> inline std::map<std::string, boost::shared_ptr<T> >& DeformApp::collection() {
-    return deform_collection<T>(this);
+template<> inline QMap<QString, QSharedPointer<Plots> >& deform_collection<Plots>(DeformApp* app) {
+    return app->m_collsPlots;
+}
+template<> inline QMap<QString, QSharedPointer<Plot> >& deform_collection<Plot>(DeformApp* app) {
+    return app->m_plots;
+}
+template<> inline QMap<QString, QSharedPointer<Layouts> >& deform_collection<Layouts>(DeformApp* app) {
+    return app->m_collsLayouts;
+}
+template<> inline QMap<QString, QSharedPointer<Layout> >& deform_collection<Layout>(DeformApp* app) {
+    return app->m_layouts;
 }
 
 // -----------------------------------------------------------------------------------------------------------
-template<class T> inline boost::shared_ptr<T> DeformApp::element(std::string name)
+template<class T> inline QSharedPointer<T> DeformApp::element(QString name)
 {
-    std::map<std::string, boost::shared_ptr<T> >& coll = collection<T>();
-    if (coll.find(name) == coll.end())
-        throw ErrorBase::create(QString("Cannot find '%1' for '%2' collection").arg(name.c_str()).arg(typeid(T).name()));
+    QMap<QString, QSharedPointer<T> >& coll = collection<T>();
+    if (!coll.contains(name))
+        throw ErrorBase::create(QString("Cannot find '%1' for '%2' collection")
+                                .arg(name).arg(typeid(T).name()));
 
     return coll[name];
 }
 
 // -----------------------------------------------------------------------------------------------------------
-template<class T> void DeformApp::xmlAddCollection(QString nodeName)
+template<class T> void DeformApp::addCollection(QString nodeName)
 {
-    std::map<std::string, boost::shared_ptr<T> >& coll = collection<T>();
+    QMap<QString, QSharedPointer<T> >& coll = collection<T>();
     QDomElement node = xmlChildNode(xmlBody(), nodeName);
     while(!node.isNull())
     {
-        std::string name = xmlNodeVar<std::string>(node, "Name", nodeAttr);
+        QString name = xmlNodeContent(node, "Name", nodeAttr);
 
         bool optional = true;
-        if (coll.find(name) == coll.end())
+        if (!coll.contains(name))
         {
-            coll[name] = boost::shared_ptr<T>(new T());
+            coll[name] = QSharedPointer<T>(new T());
             optional = false;
         }
 
-        std::string parent = xmlNodeVar<std::string>(node, "Parent", nodeAttr, true);
-        if (!parent.empty())
+        QString parent = xmlNodeContent(node, "Parent", nodeAttr, true);
+        if (!parent.isEmpty())
         {
             try {
                 *coll[name] = *element<T>(parent);
             } catch(QSharedPointer<ErrorBase> error) {
                 throw ErrorBase::create(QString("Cannot find parent '%1' for %2 with name '%3'")
-                                        .arg(parent.c_str()).arg(nodeName).arg(name.c_str()), error);
+                                        .arg(parent).arg(nodeName).arg(name), error);
             }
             optional = true;
         }

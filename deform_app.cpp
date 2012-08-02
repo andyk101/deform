@@ -1,11 +1,6 @@
 #include "deform_app.h"
 #include "deform_dlg.h"
 
-#include <boost/archive/xml_oarchive.hpp>
-#include <boost/archive/xml_iarchive.hpp>
-#include <andyk/serialization/attr_xml_iarchive.hpp>
-#include <andyk/serialization/attr_xml_oarchive.hpp>
-
 #include <fstream>
 #include <iomanip>
 #include <locale>
@@ -61,16 +56,22 @@ void DeformApp::xmlParse(const XmlManager& manager)
 {
     XmlParser::xmlParse(manager);
     testNames("Deform_v1.0", "Deform");
-    xmlAddCollection<Material>("Material");
-    xmlAddCollection<Detail>("Detail");
-    xmlAddCollection<Process>("Process");
-    xmlAddCollection<Criterion>("Criterion");
+    addCollection<Material>("Material");
+    addCollection<Detail>("Detail");
+    addCollection<Process>("Process");
+    addCollection<Criterion>("Criterion");
+    addCollection<Curve>("Curve");
+    addCollection<Plots>("Plots");
+    addCollection<Layouts>("Layouts");
 
-//    QDomElement detail = xmlChild("Detail");
-//    QDomElement direction0 = xmlChild(detail, "Direction0");
-//    QDomElement direction45 = xmlChild(detail, "Direction45");
-//    (void)direction0;
-//    (void)direction45;
+    foreach(QSharedPointer<Plots> plots, m_collsPlots.values())
+    {
+        plots->create();
+    }
+    foreach(QSharedPointer<Layouts> layouts, m_collsLayouts.values())
+    {
+        layouts->create();
+    }
 }
 
 // -----------------------------------------------------------------------------------------------------------
@@ -88,34 +89,15 @@ int DeformApp::exec()
 //        if (args.size() == 2 && args.at(1) == "-t")
 //            testTariffManager();
 
-        // load all
-//        QString source = qApp->applicationDirPath() + QDir::separator() + "deform2.xml";
-//        {
-//            std::ifstream ifs(source.toStdString().c_str());
-//            if (!ifs.good())
-//                throw ErrorBase::create(QString("Cannot open '%1' file").arg(source));
-//            boost::archive::attr_xml_iarchive ia(ifs);
-//            ia >> make_nvp("deform", *this);
-//        }
-
         // config load
         XmlManager mng;
         mng.parseFile("deform.xml", this);
 
-        // changing
-
-        // save all
-        QString target = qApp->applicationDirPath() + QDir::separator() + "deform3.xml";
-        {
-            std::ofstream ofs(target.toStdString().c_str());
-            if (!ofs.good())
-                throw ErrorBase::create(QString("Cannot open '%1' file").arg(target));
-            boost::archive::attr_xml_oarchive oa(ofs);
-            oa << make_nvp("deform", *this);
-        }
-
         // деформирование
-        //Process p;
+        //Plot::find("m_d(r_km)-08кп-Local")->calculate();
+        QSharedPointer<Process> process = Plot::find("m_d(r_km)-08кп-Local")->criterion()->process();
+        //process->start();
+        process->exec();
 
         // создание gui
         DeformDlg dlg;

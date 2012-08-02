@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<!DOCTYPE andyk_serialization>
+<andyk_serialization signature="serialization::archive" ver="9">
+<deform cls="0" level="0" ver="0">
+  <materials cls="1" level="0" ver="0">
+    <count>3</count>
+    <item_version>0</item_version>
+    <item cls="2" level="0" ver="0">
+      <first>08кп</first>
+      <second cls="3" level="0" ver="1">
+        <px cls="4" level="1" ver="0" obj="_0" Name="08кп" R0="1.706" R45="0.704" B="802.5" m="0.173" Omega="6.148" U="-0.946" aa0="0.471" aa1="-0.169" aa2="-0.143"/>
+      </second>
+    </item>
+    <item>
+      <first>АМг6</first>
+      <second>
+        <px cls_ref="4" obj="_1" Name="АМг6" R0="0.54" R45="0.95" B="461.3" m="0.124" Omega="2.148" U="-1.23" aa0="0.417" aa1="0.217" aa2="0.338"/>
+      </second>
+    </item>
+    <item>
+      <first>Л63</first>
+      <second>
+        <px cls_ref="4" obj="_2" Name="Л63" R0="1.706" R45="1.108" B="665.1" m="0.278" Omega="4.64" U="-0.769" aa0="0.793" aa1="-0.279" aa2="-0.246"/>
+      </second>
+    </item>
+  </materials>
+  <details cls="5" level="0" ver="0">
+    <count>3</count>
+    <item_version>0</item_version>
+    <item cls="6" level="0" ver="0">
+      <first>detail</first>
+      <second cls="7" level="0" ver="1">
+        <px cls="8" level="1" ver="0" obj="_3" Name="detail" r_0="100" m_d="0.5" r_kp="9" r_km="15" s_0="3" z="4.5" mu="0.1">
+          <material>
+            <px cls_ref="4" ref="_0"/>
+          </material>
+        </px>
+      </second>
+    </item>
+    <item>
+      <first>detail2</first>
+      <second>
+        <px cls_ref="8" obj="_4" Name="detail2" r_0="110" m_d="0.5" r_kp="9" r_km="15" s_0="3" z="4.5" mu="0.1">
+          <material>
+            <px cls_ref="4" ref="_0"/>
+          </material>
+        </px>
+      </second>
+    </item>
+    <item>
+      <first>detail3</first>
+      <second>
+        <px cls_ref="8" obj="_5" Name="detail3" r_0="120" m_d="0.5" r_kp="9" r_km="15" s_0="3" z="4.5" mu="0.1">
+          <material>
+            <px cls_ref="4" ref="_0"/>
+          </material>
+        </px>
+      </second>
+    </item>
+  </details>
+  <processes cls="9" level="0" ver="0">
+    <count>3</count>
+    <item_version>0</item_version>
+    <item cls="10" level="0" ver="0">
+      <first>Process</first>
+      <second cls="11" level="0" ver="1">
+        <px cls="12" level="1" ver="0" obj="_6" Name="Process" v_parts="20" calc_s="0">
+          <detail>
+            <px cls_ref="8" obj="_7" Name="" r_0="100" m_d="0.5" r_kp="9" r_km="15" s_0="3" z="4.5" mu="0.1">
+              <material>
+                <px cls_ref="4" ref="_0"/>
+              </material>
+            </px>
+          </detail>
+        </px>
+      </second>
+    </item>
+    <item>
+      <first>Process2</first>
+      <second>
+        <px cls_ref="12" obj="_8" Name="Process2" v_parts="20" calc_s="1">
+          <detail>
+            <px cls_ref="8" obj="_9" Name="" r_0="100" m_d="0.5" r_kp="9" r_km="15" s_0="3" z="4.5" mu="0.1">
+              <material>
+                <px cls_ref="4" ref="_0"/>
+              </material>
+            </px>
+          </detail>
+        </px>
+      </second>
+    </item>
+    <item>
+      <first>process3</first>
+      <second>
+        <px cls_ref="12" obj="_10" Name="process3" v_parts="100" calc_s="0">
+          <detail>
+            <px cls_ref="8" obj="_11" Name="" r_0="100" m_d="0.5" r_kp="9" r_km="15" s_0="3" z="4.5" mu="0.1">
+              <material>
+                <px cls_ref="4" ref="_0"/>
+              </material>
+            </px>
+          </detail>
+        </px>
+      </second>
+    </item>
+  </processes>
+  <criteria cls="13" level="0" ver="0">
+    <count>5</count>
+    <item_version>0</item_version>
+    <item cls="14" level="0" ver="0">
+      <first>Fenom-0.25</first>
+      <second cls="15" level="0" ver="1">
+        <px cls="16" level="1" ver="0" obj="_12" Name="Fenom-0.25" Method="0.25">
+          <process>
+            <px cls_ref="12" obj="_13" Name="" v_parts="20" calc_s="0">
+              <detail>
+                <px cls_ref="8" obj="_14" Name="" r_0="100" m_d="0.5" r_kp="9" r_km="15" s_0="3" z="4.5" mu="0.1">
+                  <material>
+                    <px cls_ref="4" ref="_0"/>
+                  </material>
+                </px>
+              </detail>
+            </px>
+          </process>
+        </px>
+      </second>
+    </item>
+    <item>
+      <first>Fenom-0.65</first>
+      <second>
+        <px cls_ref="16" obj="_15" Name="Fenom-0.65" Method="0.65">
+          <process>
+            <px cls_ref="12" obj="_16" Name="" v_parts="20" calc_s="0">
+              <detail>
+                <px cls_ref="8" obj="_17" Name="" r_0="100" m_d="0.5" r_kp="9" r_km="15" s_0="3" z="4.5" mu="0.1">
+                  <material>
+                    <px cls_ref="4" ref="_0"/>
+                  </material>
+                </px>
+              </detail>
+            </px>
+          </process>
+        </px>
+      </second>
+    </item>
+    <item>
+      <first>Fenom-1.00</first>
+      <second>
+        <px cls_ref="16" obj="_18" Name="Fenom-1.00" Method="1">
+          <process>
+            <px cls_ref="12" obj="_19" Name="" v_parts="20" calc_s="0">
+              <detail>
+                <px cls_ref="8" obj="_20" Name="" r_0="100" m_d="0.5" r_kp="9" r_km="15" s_0="3" z="4.5" mu="0.1">
+                  <material>
+                    <px cls_ref="4" ref="_0"/>
+                  </material>
+                </px>
+              </detail>
+            </px>
+          </process>
+        </px>
+      </second>
+    </item>
+    <item>
+      <first>Local</first>
+      <second>
+        <px cls_ref="16" obj="_21" Name="Local" Method="1">
+          <process>
+            <px cls_ref="12" obj="_22" Name="" v_parts="20" calc_s="0">
+              <detail>
+                <px cls_ref="8" obj="_23" Name="" r_0="100" m_d="0.5" r_kp="9" r_km="15" s_0="3" z="4.5" mu="0.1">
+                  <material>
+                    <px cls_ref="4" ref="_0"/>
+                  </material>
+                </px>
+              </detail>
+            </px>
+          </process>
+        </px>
+      </second>
+    </item>
+    <item>
+      <first>SigmaRMax</first>
+      <second>
+        <px cls_ref="16" obj="_24" Name="SigmaRMax" Method="1">
+          <process>
+            <px cls_ref="12" obj="_25" Name="" v_parts="20" calc_s="0">
+              <detail>
+                <px cls_ref="8" obj="_26" Name="" r_0="100" m_d="0.5" r_kp="9" r_km="15" s_0="3" z="4.5" mu="0.1">
+                  <material>
+                    <px cls_ref="4" ref="_0"/>
+                  </material>
+                </px>
+              </detail>
+            </px>
+          </process>
+        </px>
+      </second>
+    </item>
+  </criteria>
+</deform>
+</andyk_serialization>
+

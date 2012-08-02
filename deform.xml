@@ -1,0 +1,94 @@
+<!DOCTYPE Deform_v1.0>
+<Deform>
+
+  <!--=============================================================================================================================-->
+  <Material Name="08кп" R0="1.706" R45="0.704" B="802.5" m="0.173" Omega="6.148" U="-0.946" aa0="0.471" aa1="-0.169" aa2="-0.143" />
+  <Material Name="АМг6" R0="0.540" R45="0.950" B="461.3" m="0.124" Omega="2.148" U="-1.230" aa0="0.417" aa1="+0.217" aa2="+0.338" />
+  <Material Name="Л63"  R0="1.706" R45="1.108" B="665.1" m="0.278" Omega="4.640" U="-0.769" aa0="0.793" aa1="-0.279" aa2="-0.246" />
+  
+  <!--=============================================================================================================================-->
+  <Detail Name="Detail"  Material="08кп" r_0="100" m_d="0.5" r_kp="9" r_km="15" s_0="3" z="4.5" mu="0.100" />
+    
+  <!--=============================================================================================================================-->
+  <Process Name="Process"  Detail="Detail"  v_parts="20"  calc_s="0"/>
+  
+  <!--=============================================================================================================================-->
+  <Criterion Name="Fenom-1.00" Type="Fenom"     Method="1.00" Process="Process" />
+  <Criterion Name="Fenom-0.65" Type="Fenom"     Method="0.65" Process="Process" />
+  <Criterion Name="Fenom-0.25" Type="Fenom"     Method="0.25" Process="Process" />
+  <Criterion Name="SigmaRMax"  Type="SigmaRMax" Method="1.00" Process="Process" />
+  <Criterion Name="Local"      Type="Local"     Method="1.00" Process="Process" />
+  
+  <!--=============================================================================================================================-->
+  <Curve Name="m_d(r_km)" ArgType="r_km" ArgStart="2"    ArgEnd="8"    ArgStep="1"    />
+  <Curve Name="m_d(r_kp)" ArgType="r_kp" ArgStart="1"    ArgEnd="6"    ArgStep="1"    />
+  <Curve Name="m_d(mu)"   ArgType="mu"   ArgStart="0.05" ArgEnd="0.20" ArgStep="0.05" />
+
+  <!--=============================================================================================================================-->
+  <!-- 3*3*5=45 -->
+  <Plots Name="Графики">
+    <PlotName>{Curve}-{Material}-{Criterion}</PlotName>
+    <Detail>Detail</Detail>
+    <!--<Process>Process</Process>-->
+    
+    <Curve>m_d(r_km)</Curve>
+    <Curve>m_d(r_kp)</Curve>
+    <Curve>m_d(mu)</Curve>
+
+    <Material>08кп</Material>
+    <Material>АМг6</Material>
+    <Material>Л63</Material>
+    
+    <Criterion>Fenom-1.00</Criterion>
+    <Criterion>Fenom-0.65</Criterion>
+    <Criterion>Fenom-0.25</Criterion>
+    <Criterion>SigmaRMax</Criterion>
+    <Criterion>Local</Criterion>
+  </Plots>
+
+  <!--=============================================================================================================================-->
+  <!-- 1 -->
+  <Layouts Name="Тестовые лейауты">
+    <LayoutName>Тестовый лейаут</LayoutName>
+    <Plot>{Curve}-{Material}-{Criterion}</Plot>
+    <Curve>m_d(r_km)</Curve>
+    <Material>08кп</Material>
+    <Criterion>Local</Criterion>
+  </Layouts>
+  
+  <!--=============================================================================================================================-->
+  <!-- 3*3=9 -->
+  <Layouts Name="Модели разрушений">
+    <LayoutName>{Curve}-{Material}-Модели разрушений</LayoutName>
+    <Plot>{Curve}-{Material}-Fenom-1.00</Plot>
+    <Plot>{Curve}-{Material}-Fenom-0.65</Plot>
+    <Plot>{Curve}-{Material}-Fenom-0.25</Plot>
+
+    <Curve>m_d(r_km)</Curve>
+    <Curve>m_d(r_kp)</Curve>
+    <Curve>m_d(mu)</Curve>
+
+    <Material>08кп</Material>
+    <Material>АМг6</Material>
+    <Material>Л63</Material>
+  </Layouts>
+
+  <!--=============================================================================================================================-->
+  <!-- 3*3=9 -->
+  <Layouts Name="Все критерии">
+    <LayoutName>{Curve}-{Material}-Все критерии</LayoutName>
+    <Plot>{Curve}-{Material}-SigmaRMax</Plot>
+    <Plot>{Curve}-{Material}-Local</Plot>
+    <Plot>{Curve}-{Material}-Fenom-1.00</Plot>
+    
+    <Curve>m_d(r_km)</Curve>
+    <Curve>m_d(r_kp)</Curve>
+    <Curve>m_d(mu)</Curve>
+
+    <Material>08кп</Material>
+    <Material>АМг6</Material>
+    <Material>Л63</Material>
+  </Layouts>
+  
+  <!--=============================================================================================================================-->
+</Deform>

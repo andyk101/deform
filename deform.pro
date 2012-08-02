@@ -5,14 +5,14 @@ INCLUDEPATH *= $${DEV_PATH}/boost
 DEPENDPATH  *= $${DEV_PATH}/boost
 #LIBS        *= -L$${DEV_PATH}/boost/stage/lib -lboost_system
 #LIBS        *= -L$${DEV_PATH}/boost/stage/lib -lboost_filesystem
-LIBS        *= -L$${DEV_PATH}/boost/stage/lib -lboost_serialization
+#LIBS        *= -L$${DEV_PATH}/boost/stage/lib -lboost_serialization
 #LIBS        *= -lboost_serialization
 #LIBS        *= -L$${DEV_PATH}/boost/stage/lib -lboost_wserialization
 
 INCLUDEPATH *= $${DEV_PATH}/andyk
 DEPENDPATH  *= $${DEV_PATH}/andyk
 LIBS        *= -L$${DEV_PATH}/andyk/lib -landyk-core
-LIBS        *= -L$${DEV_PATH}/andyk/lib -landyk-serialization
+#LIBS        *= -L$${DEV_PATH}/andyk/lib -landyk-serialization
 
 INCLUDEPATH *= $${DEV_PATH}/qwt/src
 DEPENDPATH  *= $${DEV_PATH}/qwt/src
@@ -46,5 +46,5 @@ HEADERS += deform_app.h \
     detail.h
 
 OTHER_FILES += read_me.txt
-DESTDIR = /home/andyk/Dropbox/QT/exe
+DESTDIR = /home/andyk/development/deform
 TARGET = deform
