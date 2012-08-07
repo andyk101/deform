@@ -96,7 +96,6 @@ int DeformApp::exec()
         // деформирование
         //Plot::find("m_d(r_km)-08кп-Local")->calculate();
         QSharedPointer<Process> process = Plot::find("m_d(r_km)-08кп-Local")->criterion()->process();
-        //process->start();
         process->exec();
 
         // создание gui

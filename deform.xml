@@ -29,7 +29,7 @@
   <Plots Name="Графики">
     <PlotName>{Curve}-{Material}-{Criterion}</PlotName>
     <Detail>Detail</Detail>
-    <!--<Process>Process</Process>-->
+    <Process>Process</Process>
     
     <Curve>m_d(r_km)</Curve>
     <Curve>m_d(r_kp)</Curve>
@@ -50,10 +50,7 @@
   <!-- 1 -->
   <Layouts Name="Тестовые лейауты">
     <LayoutName>Тестовый лейаут</LayoutName>
-    <Plot>{Curve}-{Material}-{Criterion}</Plot>
-    <Curve>m_d(r_km)</Curve>
-    <Material>08кп</Material>
-    <Criterion>Local</Criterion>
+    <Plot>m_d(r_km)-08кп-Local</Plot>
   </Layouts>
   
   <!--=============================================================================================================================-->

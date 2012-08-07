@@ -28,12 +28,61 @@ public:
     void parse(XmlParser& parser, QDomElement& element, bool optional = false);
 };
 
-/*
 // -----------------------------------------------------------------------------------------------------------
-// Point_h_v - точка в направлении d, при шаге h, и объеме v
+// Detail - деталь при шаге h
+// -----------------------------------------------------------------------------------------------------------
+enum eDirection { eDeg0, eDeg45, eDegCount };
+struct Geom;
+class Detail
+{
+public:
+    static QSharedPointer<Detail> find(QString name);
+
+private:
+    QString m_name;
+    QSharedPointer<Material> m_material;
+    QVector< QSharedPointer<Geom> > m_geom;
+
+public:
+    // парсинг
+    double m_r_0;
+    double m_m_d;
+    double m_r_kp;
+    double m_r_km;
+    double m_s_0;
+    double m_z;
+    double m_mu;
+
+    // инициализация
+    int m_v_parts;
+    double m_h;     // шаг h
+    double m_r_2;
+    double m_r_c;
+    double m_r_max;
+    double m_V0;
+    double m_V1;
+    double m_dv;
+
+public:
+    Detail() : m_geom(eDegCount) {}
+    void parse(XmlParser& parser, QDomElement& element, bool optional = false);
+    QSharedPointer<Detail> clone() const;
+
+    QString name() const { return m_name; }
+    QSharedPointer<Material> material() const { return m_material; }
+    void setMaterial(QSharedPointer<Material> material) { m_material = material; }
+    QSharedPointer<Geom> geom(int direction) { return m_geom[direction]; }
+
+    void first_h(int v_parts);
+    bool is_max_h();
+    void next_h();
+};
+
+// -----------------------------------------------------------------------------------------------------------
+// Point - точка геометрии c шагом по объему v
 // -----------------------------------------------------------------------------------------------------------
 struct Geom;
-struct Point;
+struct GeomsPoint
 {
     Geom* m_geom;
 
@@ -50,28 +99,21 @@ struct Point;
     double m_s_expr;
     double m_omega_e;
 
-    // ...
-
-    Point_d_h_v()
-    {
-    }
-
-    double d() const;
-    double h() const;
+    GeomsPoint();
+    GeomsPoint(Geom* geom, double s);
 };
 
 // -----------------------------------------------------------------------------------------------------------
-// Geom - геометрия в направлении d, при шаге h
+// Geom - геометрия детали в направлении d
 // -----------------------------------------------------------------------------------------------------------
 struct Geom
 {
-    Geom* m_pGeom_prev_h;
-    QVector<> m_points;
-    double m_h;
+    Material* m_material; // материал
+    Detail* m_detail;     // деталь
+    int m_direction;      // направление d
+    QVector<GeomsPoint> m_points;
 
-    double m_s_1_0;
-    double m_s_1_45;
-    double m_h;
+    double m_s_1;
     double m_V2;
     double m_V5;
     double m_V6;
@@ -81,65 +123,42 @@ struct Geom
     double m_r_1;
     double m_r_k;
 
+    int m_V7_i_max;
+    int m_V6_i_max;
+    int m_V5_i_max;
+    int m_V2_i_max;
 
-public:
-    Geom();
+    // материал
+    double R0() const { return m_material->m_R0; }
+    double R45() const { return m_material->m_R45; }
+    double B() const { return m_material->m_B; }
+    double m() const { return m_material->m_m; }
+    double Omega() const { return m_material->m_Omega; }
+    double U() const { return m_material->m_U; }
+    double aa0() const { return m_material->m_aa0; }
+    double aa1() const { return m_material->m_aa1; }
+    double aa2() const { return m_material->m_aa2; }
 
+    // деталь
+    double r_0() const { return m_detail->m_r_0; }
+    double m_d() const { return m_detail->m_m_d; }
+    double r_kp() const { return m_detail->m_r_kp; }
+    double r_km() const { return m_detail->m_r_km; }
+    double s_0() const { return m_detail->m_s_0; }
+    double z() const { return m_detail->m_z; }
+    double mu() const { return m_detail->m_mu; }
+    int v_parts() const { return m_detail->m_v_parts; }
+    double h() const { return m_detail->m_h; }
+    double r_2() const { return m_detail->m_r_2; }
+    double r_c() const { return m_detail->m_r_c; }
+    double r_max() const { return m_detail->m_r_max; }
+    double V0() const { return m_detail->m_V0; }
+    double V1() const { return m_detail->m_V1; }
+    double dv() const { return m_detail->m_dv; }
 
-};
-
-// -----------------------------------------------------------------------------------------------------------
-// Direction - направление
-// -----------------------------------------------------------------------------------------------------------
-struct Direction
-{
-public:
-
-private:
-    Geom m_geom[eDegSize];
-
-public:
-    Direction()
-    {
-    }
-};
-*/
-
-// -----------------------------------------------------------------------------------------------------------
-// Detail
-// -----------------------------------------------------------------------------------------------------------
-class Detail
-{
-public:
-    static QSharedPointer<Detail> find(QString name);
-
-private:
-    QString m_name;
-    QSharedPointer<Material> m_material;
-
-    double m_r_0;
-    double m_m_d;
-    double m_r_kp;
-    double m_r_km;
-    double m_s_0;
-    double m_z;
-    double m_mu;
-
-    double m_r_2;
-    double m_r_c;
-    double m_r_max;
-    double m_V0;
-    double m_V1;
-
-    //QVector<Direction> m_direction;
-public:
-    Detail() {}
-    void parse(XmlParser& parser, QDomElement& element, bool optional = false);
-    QSharedPointer<Detail> clone() const;
-
-    QString name() const { return m_name; }
-    QSharedPointer<Material> material() const { return m_material; }
-    void setMaterial(QSharedPointer<Material> material) { m_material = material; }
+    Geom(Detail* detail, int direction);
+    bool is_max_h();
+    void next_h();
 };
 
 // -----------------------------------------------------------------------------------------------------------
@@ -168,9 +187,7 @@ public:
     QSharedPointer<Detail> detail() const { return m_detail; }
     void setDetail(QSharedPointer<Detail> detail) { m_detail = detail; }
 
-    void start() {}
-    void step() {}
-    void exec() {}
+    void exec();
 };
 
 // -----------------------------------------------------------------------------------------------------------

@@ -55,6 +55,103 @@ QSharedPointer<Detail> Detail::clone() const
     return det;
 }
 
+void Detail::first_h(int v_parts)
+{
+    m_v_parts = v_parts;
+    m_h = 0;
+    m_r_2 = m_m_d*m_r_0 - m_z/2;
+    m_r_c = m_r_km + m_z + m_r_2;
+    m_r_max = m_m_d*m_r_0;
+    m_V0 = M_PI*m_s_0*pow(m_r_0, 2);
+    m_V1 = M_PI*m_s_0*pow(m_r_2-m_r_kp, 2);
+    m_dv = m_V0/v_parts;
+
+    m_geom[eDeg0] = QSharedPointer<Geom>(new Geom(this, eDeg0));
+    m_geom[eDeg45] = QSharedPointer<Geom>(new Geom(this, eDeg45));
+}
+
+bool Detail::is_max_h()
+{
+    return m_geom[eDeg0]->is_max_h() ||
+           m_geom[eDeg45]->is_max_h();
+}
+
+void Detail::next_h()
+{
+    m_geom[eDeg0]->next_h();
+    m_geom[eDeg45]->next_h();
+}
+
+// -----------------------------------------------------------------------------------------------------------
+// Point
+// -----------------------------------------------------------------------------------------------------------
+GeomsPoint::GeomsPoint()
+{
+    throw ErrorBase::create(QString("GeomsPoint() is invalid constructor"));
+}
+
+GeomsPoint::GeomsPoint(Geom* geom, double s)
+    : m_geom(geom), m_s(s)
+{
+    m_v = m_r = m_h = m_epsilon_phi = m_epsilon_i =
+          m_sigma_s = m_sigma_r = m_sigma_phi = m_s_expr = m_omega_e = 0;
+}
+
+// -----------------------------------------------------------------------------------------------------------
+// Geom
+// -----------------------------------------------------------------------------------------------------------
+Geom::Geom(Detail* detail, int direction)
+    : m_material(&*detail->material()), m_detail(detail), m_direction(direction),
+      m_points(v_parts()+1, GeomsPoint(this, s_0()))
+{
+    m_s_1 = s_0();
+    m_V2 = m_V6 = 0;
+    m_V5 = M_PI*s_0()*( pow(r_c(),2) - pow(r_2()-r_kp(),2) );
+    m_V7 = M_PI*s_0()*( pow(r_0(),2) - pow(r_c(),2) );
+    m_alpha = 0;
+    m_AB = r_c() - (r_2() - r_kp());
+    m_r_1 = r_c();
+    m_r_k = r_0();
+
+    m_V7_i_max = m_V6_i_max = m_V5_i_max = m_V2_i_max = -1;
+    for (int i = 0; i < m_points.count(); i++)
+    {
+        GeomsPoint& pt = m_points[i];
+        pt.m_v = V0() - i*dv();
+
+        pt.m_r = (i == 0) ? r_0() :
+          (i < v_parts()) ? sqrt(pow(m_points[i-1].m_r,2) - dv()/(M_PI*s_0())) :
+                            0;
+
+        if (pt.m_r >= r_c())
+        {
+            m_V7_i_max = m_V6_i_max = m_V5_i_max = m_V2_i_max = i;
+        }
+        else if (pt.m_r >= r_2() - r_kp())
+        {
+            m_V5_i_max = m_V2_i_max = i;
+        }
+
+        if (pt.m_r <= r_max())
+        {
+            break;
+        }
+    }
+}
+
+bool Geom::is_max_h()
+{
+    return m_points[0].m_r < m_r_1;
+}
+
+void Geom::next_h()
+{
+    if (is_max_h())
+        return;
+
+    //...
+}
+
 // -----------------------------------------------------------------------------------------------------------
 // Process
 // -----------------------------------------------------------------------------------------------------------
@@ -89,6 +186,14 @@ QSharedPointer<Process> Process::clone() const
     QSharedPointer<Process> proc(new Process(*this));
     proc->m_name = "";
     return proc;
+}
+
+void Process::exec()
+{
+    for (m_detail->first_h(m_v_parts); m_detail->is_max_h(); m_detail->next_h())
+    {
+        // ...
+    }
 }
 
 // -----------------------------------------------------------------------------------------------------------
