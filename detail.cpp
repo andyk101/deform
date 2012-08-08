@@ -93,8 +93,9 @@ void Detail::first_h(int v_parts)
     m_r_max = m_m_d*m_r_0;
     m_V0 = M_PI*m_s_0*pow(m_r_0, 2);
     m_V1 = M_PI*m_s_0*pow(m_r_2-m_r_kp, 2);
-    double V7 = M_PI*m_s_0*( pow(m_r_0,2) - pow(m_r_c,2) );
-    m_v_parts = (int)round(V7 / m_V0 * v_parts);
+    m_v_parts = v_parts;
+//    double V7 = M_PI*m_s_0*( pow(m_r_0,2) - pow(m_r_c,2) );
+//    m_v_parts = (int)round(V7 / m_V0 * v_parts);
 
     m_geom[eDeg0] = QSharedPointer<Geom>(new Geom(this, eDeg0));
     m_geom[eDeg45] = QSharedPointer<Geom>(new Geom(this, eDeg45));
@@ -107,6 +108,7 @@ bool Detail::isValid() const
 
 void Detail::next_h(double dh)
 {
+    // Возможно следует поднять m_h выше???
     m_geom[eDeg0]->next_h(dh);
     m_geom[eDeg45]->next_h(dh);
 }
