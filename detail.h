@@ -55,7 +55,6 @@ public:
 
     // инициализация
     int m_v_parts;
-    double m_h;     // шаг h
     double m_r_2;
     double m_r_c;
     double m_r_max;
@@ -74,8 +73,8 @@ public:
     QSharedPointer<Geom> geom(int direction) { return m_geom[direction]; }
 
     void first_h(int v_parts);
-    bool is_max_h();
-    void next_h();
+    bool isValid() const;
+    void next_h(double dh);
 };
 
 // -----------------------------------------------------------------------------------------------------------
@@ -106,13 +105,16 @@ struct GeomsPoint
 // -----------------------------------------------------------------------------------------------------------
 // Geom - геометрия детали в направлении d
 // -----------------------------------------------------------------------------------------------------------
+enum eBounds { eBoundV7, eBoundV6, eBoundRmax, eBoundV5, eBoundCount };
 struct Geom
 {
     Material* m_material; // материал
     Detail* m_detail;     // деталь
     int m_direction;      // направление d
     QVector<GeomsPoint> m_points;
+    QVector<GeomsPoint> m_bounds;
 
+    double m_h;
     double m_s_1;
     double m_V2;
     double m_V5;
@@ -126,7 +128,8 @@ struct Geom
     int m_V7_i_max;
     int m_V6_i_max;
     int m_V5_i_max;
-    int m_V2_i_max;
+
+    bool m_valid;
 
     // материал
     double R0() const { return m_material->m_R0; }
@@ -148,7 +151,6 @@ struct Geom
     double z() const { return m_detail->m_z; }
     double mu() const { return m_detail->m_mu; }
     int v_parts() const { return m_detail->m_v_parts; }
-    double h() const { return m_detail->m_h; }
     double r_2() const { return m_detail->m_r_2; }
     double r_c() const { return m_detail->m_r_c; }
     double r_max() const { return m_detail->m_r_max; }
@@ -156,9 +158,17 @@ struct Geom
     double V1() const { return m_detail->m_V1; }
     double dv() const { return m_detail->m_dv; }
 
+    // дополнительные
+    double s_1_x(double AB_x) const;
+    double V2_x(double alpha_x) const;
+    double V5_x(double AB_x) const;
+    double V6_x(double alpha_x) const;
+    double V7_x(double r_k_x) const;
+    bool isValid() const { return m_valid; }
+
+    void calcPoint(double& r_x, double& h_x, double v_x) const;
     Geom(Detail* detail, int direction);
-    bool is_max_h();
-    void next_h();
+    void next_h(double dh);
 };
 
 // -----------------------------------------------------------------------------------------------------------
