@@ -54,13 +54,11 @@ public:
     double m_mu;
 
     // инициализация
-    int m_v_parts;
     double m_r_2;
     double m_r_c;
     double m_r_max;
     double m_V0;
     double m_V1;
-    double m_dv;
 
 public:
     Detail() : m_geom(eDegCount) {}
@@ -72,9 +70,9 @@ public:
     void setMaterial(QSharedPointer<Material> material) { m_material = material; }
     QSharedPointer<Geom> geom(int direction) { return m_geom[direction]; }
 
-    void first_h(int v_parts);
+    void first(int v_parts);
     bool isValid() const;
-    void next_h(double dh);
+    void next(double dh);
 };
 
 // -----------------------------------------------------------------------------------------------------------
@@ -150,13 +148,11 @@ struct Geom
     double s_0() const { return m_detail->m_s_0; }
     double z() const { return m_detail->m_z; }
     double mu() const { return m_detail->m_mu; }
-    int v_parts() const { return m_detail->m_v_parts; }
     double r_2() const { return m_detail->m_r_2; }
     double r_c() const { return m_detail->m_r_c; }
     double r_max() const { return m_detail->m_r_max; }
     double V0() const { return m_detail->m_V0; }
     double V1() const { return m_detail->m_V1; }
-    double dv() const { return m_detail->m_dv; }
 
     // дополнительные
     double s_1_x(double AB_x) const;
@@ -167,8 +163,8 @@ struct Geom
     bool isValid() const { return m_valid; }
 
     void calcPoint(double& r_x, double& h_x, double v_x) const;
-    Geom(Detail* detail, int direction);
-    void next_h(double dh);
+    Geom(Detail* detail, int direction, int count, double dv);
+    void next(double dh);
 };
 
 // -----------------------------------------------------------------------------------------------------------

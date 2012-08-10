@@ -1,10 +1,11 @@
 #include "detail.h"
 #include "deform_app.h"
+#include <boost/math/special_functions/sign.hpp>
 
 // ----------------------------------------------------------------------------------------------------------
 // Решение квадратного уравнения a*x^2+b*x+c=0, если a,b,c - числа с плав. точкой.
 // ----------------------------------------------------------------------------------------------------------
-bool SquareSolve(double& x1, double& x2, double a, double b, double c)
+int SquareSolve(double& x1, double& x2, double a, double b, double c)
 {
     if (a == 0)
     {
@@ -13,8 +14,8 @@ bool SquareSolve(double& x1, double& x2, double a, double b, double c)
             return false;
 
         // b*x+c=0
-        x1 = x2 = -c/b;
-        return true;
+        x1 = -c/b;
+        return 1;
     }
 
     // x^2+b*x+c=0
@@ -23,13 +24,72 @@ bool SquareSolve(double& x1, double& x2, double a, double b, double c)
 
     double d = b*b-4*c;
     if (d < 0)
-        return false;
+        return 0;
 
     d = sqrt(d)/2;
     b = -b/2;
+
+    if (d == 0)
+    {
+        x1 = b;
+        return 1;
+    }
+
     x1 = b-d;
     x2 = b+d;
-    return true;
+    return 2;
+}
+
+// ----------------------------------------------------------------------------------------------------------
+// Решение кубич. уравнения a*x^3+b*x^2+c*x+d=0, если a,b,c,d - числа с плав. точкой.
+// ----------------------------------------------------------------------------------------------------------
+int CubeSolve(double& x1, double& x2, double& x3, double a, double b, double c, double d)
+{
+    if (a == 0)
+    {
+        return SquareSolve(x1, x2, b, c, d);
+    }
+    double p = -pow(b,2)/(3*pow(a,2))+c/a;
+    double q = 2*pow(b,3)/(27*pow(a,3))-b*c/(3*pow(a,2))+d/a;
+    double Q = pow(p/3,3)+pow(q/2,2);
+    double R = boost::math::sign(q)*sqrt(fabs(p)/3);
+
+    // 1 корень
+    double phi = 0;
+    if (p > 0)
+    {
+        phi = asinh(q/(2*pow(R,3)));
+        x1 = -2*R*sinh(phi/3)-b/(3*a);
+        return 1;
+    }
+    if (Q > 0)
+    {
+        phi = acosh(q/(2*pow(R,3)));
+        x1 = -2*R*cosh(phi/3)-b/(3*a);
+        return 1;
+    }
+
+    // 3 корня
+    phi = acos(q/(2*pow(R,3)));
+    x1 = -2*R*cos(phi/3)-b/(3*a);
+    x2 = -2*R*cos(phi/3+2*M_PI/3)-b/(3*a);
+    x3 = -2*R*cos(phi/3+4*M_PI/3)-b/(3*a);
+    return 3;
+}
+
+// -----------------------------------------------------------------------------------------------------------
+// Поиск корней методом итераций
+// ----------------------------------------------------------------------------------------------------------
+template<class Phi> double IterSolve(Phi phi, double x0, double eps)
+{
+    double x1 = phi(x0);
+    double x2 = phi(x1);
+    while ( fabs(x2 - x1) > eps )
+    {
+        x1 = x2;
+        x2 = phi(x1);
+    }
+    return x2;
 }
 
 // -----------------------------------------------------------------------------------------------------------
@@ -86,19 +146,23 @@ QSharedPointer<Detail> Detail::clone() const
     return det;
 }
 
-void Detail::first_h(int v_parts)
+void Detail::first(int v_parts)
 {
     m_r_2 = m_m_d*m_r_0 - m_z/2;
     m_r_c = m_r_km + m_z + m_r_2;
     m_r_max = m_m_d*m_r_0;
     m_V0 = M_PI*m_s_0*pow(m_r_0, 2);
     m_V1 = M_PI*m_s_0*pow(m_r_2-m_r_kp, 2);
-    m_v_parts = v_parts;
-//    double V7 = M_PI*m_s_0*( pow(m_r_0,2) - pow(m_r_c,2) );
-//    m_v_parts = (int)round(V7 / m_V0 * v_parts);
 
-    m_geom[eDeg0] = QSharedPointer<Geom>(new Geom(this, eDeg0));
-    m_geom[eDeg45] = QSharedPointer<Geom>(new Geom(this, eDeg45));
+//    double V7 = M_PI*m_s_0*( pow(m_r_0,2) - pow(m_r_c,2) );
+//    int V7_parts = (int)round(V7 / (m_V0-m_V1) * v_parts);
+//    double dv = V7 / V7_parts;
+//    int count = (int)floor((m_V0-m_V1) / dv) + 1;
+    double dv = m_V0 / v_parts;
+    int count = (int)floor((m_V0-m_V1) / dv) + 1;
+
+    m_geom[eDeg0] = QSharedPointer<Geom>(new Geom(this, eDeg0, count, dv));
+    m_geom[eDeg45] = QSharedPointer<Geom>(new Geom(this, eDeg45, count, dv));
 }
 
 bool Detail::isValid() const
@@ -106,11 +170,10 @@ bool Detail::isValid() const
     return m_geom[eDeg0]->isValid() && m_geom[eDeg45]->isValid();
 }
 
-void Detail::next_h(double dh)
+void Detail::next(double dh)
 {
-    // Возможно следует поднять m_h выше???
-    m_geom[eDeg0]->next_h(dh);
-    m_geom[eDeg45]->next_h(dh);
+    m_geom[eDeg0]->next(dh);
+    m_geom[eDeg45]->next(dh);
 }
 
 // -----------------------------------------------------------------------------------------------------------
@@ -131,9 +194,11 @@ GeomsPoint::GeomsPoint(Geom* geom, double s)
 // -----------------------------------------------------------------------------------------------------------
 // Geom
 // -----------------------------------------------------------------------------------------------------------
-Geom::Geom(Detail* detail, int direction)
+Geom::Geom(Detail* detail, int direction, int count, double dv)
     : m_material(&*detail->material()), m_detail(detail), m_direction(direction),
-      m_points(v_parts()+1, GeomsPoint(this, s_0())), m_bounds(eBoundCount, GeomsPoint(this, s_0())), m_valid(false)
+      m_points(count, GeomsPoint(this, s_0())),
+      m_bounds(eBoundCount, GeomsPoint(this, s_0())),
+      m_valid(false)
 {
     m_h = 0;
     m_s_1 = s_0();
@@ -149,11 +214,13 @@ Geom::Geom(Detail* detail, int direction)
     for (int i = 0; i < m_points.count(); i++)
     {
         GeomsPoint& pt = m_points[i];
-        pt.m_v = V0() - i*dv();
+        double v = V0() - i*dv;
+        if (v < V1())
+            break;
 
+        pt.m_v = v;
         pt.m_r = (i == 0) ? r_0() :
-          (i < v_parts()) ? sqrt(pow(m_points[i-1].m_r,2) - dv()/(M_PI*s_0())) :
-                            0;
+                            sqrt(pow(m_points[i-1].m_r,2) - dv/(M_PI*s_0()));
 
         if (pt.m_r >= r_c())
         {
@@ -162,10 +229,6 @@ Geom::Geom(Detail* detail, int direction)
         else if (pt.m_r >= r_2() - r_kp())
         {
             m_V5_i_max = i;
-        }
-        else
-        {
-            break;
         }
     }
 
@@ -182,14 +245,16 @@ Geom::Geom(Detail* detail, int direction)
 double Geom::s_1_x(double AB_x) const
 {
     if (AB_x < 0 || AB_x > m_AB )
-        throw ErrorBase::create(QString("AB_x must be in range [0, %1], but actual is %2").arg(m_AB).arg(AB_x));
+        throw ErrorBase::create(QString("AB_x must be in range [0, %1], but actual is %2")
+            .arg(m_AB).arg(AB_x));
     return s_0()+(m_s_1-s_0())*AB_x/m_AB;
 }
 
 double Geom::V2_x(double alpha_x) const
 {
     if (alpha_x < 0 || alpha_x > m_alpha )
-        throw ErrorBase::create(QString("alpha_x must be in range [0, %1], but actual is %2").arg(m_alpha).arg(alpha_x));
+        throw ErrorBase::create(QString("alpha_x must be in range [0, %1], but actual is %2")
+            .arg(m_alpha).arg(alpha_x));
     return 4*M_PI/3*s_0()*pow(sin(alpha_x/2),2)*(3*pow(r_kp(),2) + 3*r_kp()*s_0() + pow(s_0(),2)) +
         M_PI*alpha_x*s_0()*(2*r_kp()+s_0())*(r_2()-r_kp());
 }
@@ -197,7 +262,8 @@ double Geom::V2_x(double alpha_x) const
 double Geom::V5_x(double AB_x) const
 {
     if (AB_x < 0 || AB_x > m_AB )
-        throw ErrorBase::create(QString("AB_x must be in range [0, %1], but actual is %2").arg(m_AB).arg(AB_x));
+        throw ErrorBase::create(QString("AB_x must be in range [0, %1], but actual is %2")
+            .arg(m_AB).arg(AB_x));
     double s_1_xx = s_1_x(AB_x);
     return M_PI*AB_x/(3*cos(m_alpha)) * ( AB_x*(s_0()+2*s_1_xx) + 3*(s_0()+s_1_xx)*(r_2()-r_kp()) +
         sin(m_alpha)*((s_0()+s_1_xx)*(3*r_kp()+2*s_0())-pow(s_1_xx,2)) );
@@ -206,7 +272,8 @@ double Geom::V5_x(double AB_x) const
 double Geom::V6_x(double alpha_x) const
 {
     if (alpha_x < 0 || alpha_x > m_alpha )
-        throw ErrorBase::create(QString("alpha_x must be in range [0, %1], but actual is %2").arg(m_alpha).arg(alpha_x));
+        throw ErrorBase::create(QString("alpha_x must be in range [0, %1], but actual is %2")
+            .arg(m_alpha).arg(alpha_x));
     return M_PI*alpha_x*m_s_1*(2*r_km()+m_s_1)*r_c() - 4.0/3*M_PI*m_s_1*pow(sin(alpha_x/2),2)*
         (3*pow(r_km(),2)+3*r_km()*m_s_1+pow(m_s_1,2));
 }
@@ -214,36 +281,77 @@ double Geom::V6_x(double alpha_x) const
 double Geom::V7_x(double r_k_x) const
 {
     if (r_k_x < r_c() || r_k_x > m_r_k )
-        throw ErrorBase::create(QString("r_k_x must be in range [%1, %2], but actual is %3").arg(r_c()).arg(m_r_k).arg(r_k_x));
+        throw ErrorBase::create(QString("r_k_x must be in range [%1, %2], but actual is %3")
+            .arg(r_c()).arg(m_r_k).arg(r_k_x));
     return M_PI*m_s_1*(pow(r_k_x,2) - pow(r_c(),2));
 }
 
 // -----------------------------------------------------------------------------------------------------------
-void Geom::calcPoint(double& r_x, double& h_x, double v_x) const
+// Итерационная функция для уравнения f(x)=a*sin(x/2)^2+b*x+c (по методу Ньютона phi(x)=x-f(x)/f'(x))
+// ----------------------------------------------------------------------------------------------------------
+struct PhiV6
+{
+    double a, b, c;
+
+    double operator() (double x) const
+    {
+        return x - (a*pow(sin(x/2),2)+b*x+c)/(a/2*sin(x)+b);
+    }
+};
+
+// -----------------------------------------------------------------------------------------------------------
+void Geom::calcPoint(double& r_x, double& h_z, double v_x) const
 {
     if (v_x < V1()+m_V2 || v_x > V0() )
-        throw ErrorBase::create(QString("v_x must be in range [%1, %2], but actual is %3").arg(V1()+m_V2).arg(V0()).arg(v_x));
+        throw ErrorBase::create(QString("v_x must be in range [%1, %2], but actual is %3")
+            .arg(V1()+m_V2).arg(V0()).arg(v_x));
 
     // V7
     if (m_V7 > 0 && v_x >= V0()-m_V7)
     {
-        r_x = sqrt((v_x-V0()+m_V7)/(M_PI*m_s_1+pow(r_c(),2)));
-        h_x = 0;
+        r_x = sqrt((v_x-V0()+m_V7)/(M_PI*m_s_1)+pow(r_c(),2));
+        h_z = 0;
     }
     // V6
     else if (v_x >= V1()+m_V2+m_V5)
     {
-        //alpha_x:=fsolve(fV6(alpha_xx)=V1()+m_V2+m_V5+V6_x(m_alpha)-v_x, alpha_xx=0..alpha);
-        //r_x = r_c()-(r_km()+s_0()/2)*sin(alpha_x);
-        //h_z = (r_km()+s_0()/2)*(1-cos(alpha_x));
+        // f(x)=a*sin(x/2)^2+b*x+c
+        PhiV6 phi;
+        phi.a = -4.0/3*M_PI*m_s_1*(3*pow(r_km(),2)+3*r_km()*m_s_1+pow(m_s_1,2));
+        phi.b = M_PI*m_s_1*(2*r_km()+m_s_1)*r_c();
+        phi.c = v_x-(V1()+m_V2+m_V5+V6_x(m_alpha));
+
+        double alpha_x = IterSolve(phi, M_PI/4, 0.000000000001);
+        r_x = r_c()-(r_km()+s_0()/2)*sin(alpha_x);
+        h_z = (r_km()+s_0()/2)*(1-cos(alpha_x));
     }
     // V5
     else if (v_x >= V1()+m_V2)
     {
+        // fV5(AB_xx,fs_1(AB_xx))=v-V1-V2) <-> { a1*AB_xx^3+b1*AB_xx^2+c1*AB_xx+d1=0, 0<=AB_xx<=AB }
+        double a = M_PI*(m_s_1-s_0())*(-2*m_AB+sin(m_alpha)*(m_s_1-s_0()));
+        double b = -3*M_PI*m_AB*(m_AB*s_0()+(m_s_1-s_0())*((r_2()-r_kp())+sin(m_alpha)*r_kp()));
+        double c = 3*M_PI*pow(m_AB,2)*s_0()*(-2*r_2()+2*r_kp()-sin(m_alpha)*(2*r_kp()+s_0()));
+        double d = 3*cos(m_alpha)*pow(m_AB,2)*(v_x-V1()-m_V2);
+
+        double AB_x, x1,x2,x3;
+        int roots = CubeSolve(x1,x2,x3, a,b,c,d);
+        if (roots>=1 && 0<=x1 && x1<=m_AB)
+            AB_x = x1;
+        else if (roots>=2 && 0<=x2 && x2<=m_AB)
+            AB_x = x2;
+        else if (roots>=3 && 0<=x3 && x3<=m_AB)
+            AB_x = x3;
+        else
+        {
+            throw ErrorBase::create(QString("Cannot find AB_x for v_x=%1").arg(v_x));
+        }
+        r_x = m_r_1 - m_AB + AB_x;
+        h_z = m_h - (r_kp()+s_0()/2)*(1-cos(m_alpha)) - tan(m_alpha)*AB_x;
     }
 }
 
-void Geom::next_h(double dh)
+void Geom::next(double dh)
 {
     if (!isValid())
         return;
@@ -274,15 +382,11 @@ void Geom::next_h(double dh)
         double b2 = -2*a1*c1;
         double c2 = pow(c1,2)-pow(b1,2);
 
-        double x1, x2;
-        m_valid = SquareSolve(x1,x2, a2,b2,c2);
-        if (!m_valid)
-            return;
-
-        double x;
-        if (x1>=0 && (c1-x1*a1)/b1>=0)
+        double x, x1, x2;
+        int roots = SquareSolve(x1,x2, a2,b2,c2);
+        if (roots>=1 && x1>=0 && (c1-x1*a1)/b1>=0)
             x = x1;
-        else if (x2>=0 && (c1-x2*a1)/b1>=0)
+        else if (roots>=2 && x2>=0 && (c1-x2*a1)/b1>=0)
             x = x2;
         else
         {
@@ -291,6 +395,8 @@ void Geom::next_h(double dh)
         }
         m_alpha = asin(x);
     }
+    //m_alpha = M_PI / 4;
+    //m_s_1 = s_0()*1.3;
     m_AB = r_c() - r_2() + r_kp() - sin(m_alpha)*(r_km()+r_kp()+s_0());
     m_r_1 = r_c() - (r_km()+s_0()/2)*sin(m_alpha);
 
@@ -321,11 +427,6 @@ void Geom::next_h(double dh)
     for (int i = 0; i < V5_i_max_prev; i++)
     {
         GeomsPoint& pt = m_points[i];
-        calcPoint(pt.m_r, pt.m_h, pt.m_v);
-
-        if (i == 0)
-            m_r_k = pt.m_r;
-
         if (pt.m_v >= V0() - m_V7)
         {
             m_V7_i_max = m_V6_i_max = m_V5_i_max = i;
@@ -342,7 +443,20 @@ void Geom::next_h(double dh)
         {
             break;
         }
+
+        calcPoint(pt.m_r, pt.m_h, pt.m_v);
+
+        if (i == 0)
+            m_r_k = pt.m_r;
     }
+//    m_bounds[eBoundV7].m_v = V0()-m_V7;
+//    m_bounds[eBoundV6].m_v = V0()-m_V7-m_V6;
+//    double AB_x = r_max-r_2+r_kp-(r_kp+s_0/2)*sin(alpha);
+//    m_bounds[eBoundRmax].m_v = V1()+m_V2+V5_x();
+//    m_bounds[eBoundV5].m_v = V1()+m_V2;
+//    GeomsPoint& pt = m_bounds[eBoundV7];
+//    pt.m_v = V0()-m_V7;
+//    calcPoint(pt.m_r, pt.m_h, pt.m_v);
 }
 
 // -----------------------------------------------------------------------------------------------------------
@@ -383,8 +497,8 @@ QSharedPointer<Process> Process::clone() const
 
 void Process::exec()
 {
-    m_detail->first_h(m_v_parts);
-    m_detail->next_h(1.0);
+    m_detail->first(m_v_parts);
+    m_detail->next(27.0);
     //for (m_detail->first_h(m_v_parts); m_detail->isValid(); m_detail->next_h())
     {
         // ...
