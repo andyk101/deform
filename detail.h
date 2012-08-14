@@ -86,7 +86,8 @@ struct GeomsPoint
     double m_v;
     double m_r;
     double m_h;
-    double m_s;
+    double m_alpha;
+    double m_s;    
 
     double m_epsilon_phi;
     double m_epsilon_i;
@@ -110,7 +111,6 @@ struct Geom
     Detail* m_detail;     // деталь
     int m_direction;      // направление d
     QVector<GeomsPoint> m_points;
-    QVector<GeomsPoint> m_bounds;
 
     double m_h;
     double m_s_1;
@@ -160,10 +160,15 @@ struct Geom
     double V5_x(double AB_x) const;
     double V6_x(double alpha_x) const;
     double V7_x(double r_k_x) const;
+
+//    double V6_p(double r1, double r2, double s) const;
+//    double V7_p(double r1, double r2, double s) const;
+
     bool isValid() const { return m_valid; }
 
-    void calcPoint(double& r_x, double& h_x, double v_x) const;
+    void calcPoint(double& r_x, double& h_x, double& alpha_x, double v_x) const;
     Geom(Detail* detail, int direction, int count, double dv);
+    double find_max_dv();
     void next(double dh);
 };
 
