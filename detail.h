@@ -104,7 +104,7 @@ struct GeomsPoint
 // -----------------------------------------------------------------------------------------------------------
 // Geom - геометрия детали в направлении d
 // -----------------------------------------------------------------------------------------------------------
-enum eBounds { eBoundV7, eBoundV6, eBoundRmax, eBoundV5, eBoundCount };
+enum eV { eV7, eV6, eV5, eVCount };
 struct Geom
 {
     Material* m_material; // материал
@@ -112,20 +112,36 @@ struct Geom
     int m_direction;      // направление d
     QVector<GeomsPoint> m_points;
 
-    double m_h;
+    double m_h, m_max_dh;
+
     double m_s_1;
     double m_V2;
     double m_V5;
     double m_V6;
     double m_V7;
+    double m_V5_bound;
+    double m_V6_bound;
+    double m_V7_bound;
     double m_alpha;
     double m_AB;
     double m_r_1;
     double m_r_k;
 
+    double m_V_eps;
     int m_V7_i_max;
     int m_V6_i_max;
     int m_V5_i_max;
+
+    // fV6(alpha_xx)+fV5(alpha_xx)+fV2(alpha_xx)=v <-> a5*sin(x/2)^2*cos(x)+b5*x*cos(x)+a3*sin(x)^2+b3*sin(x)-v*cos(x)+c3=0
+    //               fV5(alpha_xx)+fV2(alpha_xx)=v <-> a1*sin(x/2)^2*cos(x)+b1*x*cos(x)+a3*sin(x)^2+b3*sin(x)-v*cos(x)+c3=0
+    //                               fV6(alpha_xx) <-> a4*sin(alpha_xx/2)^2+b4*alpha_xx;
+    //                               fV5(alpha_xx) <-> (a3*sin(alpha_xx)^2+b3*sin(alpha_xx)+c3)/cos(alpha_xx);
+    //                               fV2(alpha_xx) <-> a1*sin(alpha_xx/2)^2+b1*alpha_xx;
+    double m_a1, m_b1;
+    double m_a2, m_b2, m_c2, m_d2;
+    double m_a3, m_b3, m_c3;
+    double m_a4, m_b4;
+    double m_a5, m_b5;
 
     bool m_valid;
 
@@ -155,20 +171,21 @@ struct Geom
     double V1() const { return m_detail->m_V1; }
 
     // дополнительные
-    double s_1_x(double AB_x) const;
-    double V2_x(double alpha_x) const;
-    double V5_x(double AB_x) const;
-    double V6_x(double alpha_x) const;
-    double V7_x(double r_k_x) const;
-
-//    double V6_p(double r1, double r2, double s) const;
-//    double V7_p(double r1, double r2, double s) const;
+    int eV_x(double v_xx) const;
+    double AB_x(double alpha_xx) const;
+    double h_x(double alpha_xx, double AB_xx) const;
+    double V2_x(double alpha_xx) const;
+    double V5_x(double alpha_xx, double AB_xx) const;
+    double V6_x(double alpha_xx) const;
+    double V7_x(double r_k_xx) const;
 
     bool isValid() const { return m_valid; }
 
     void calcPoint(double& r_x, double& h_x, double& alpha_x, double v_x) const;
     Geom(Detail* detail, int direction, int count, double dv);
-    double find_max_dv();
+    void recalc_V_coeff();
+    void recalc_max_dh();
+
     void next(double dh);
 };
 

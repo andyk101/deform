@@ -78,7 +78,7 @@ void DeformApp::xmlParse(const XmlManager& manager)
 int DeformApp::exec()
 {
     //using namespace boost::archive;
-    try
+    //try
     {
         Loger::instance("deform.txt");
         Loger::log("Deform was started", "", Loger::sLevel0);
@@ -105,12 +105,12 @@ int DeformApp::exec()
         // обработка цикла сообщений
         return dlg.exec();
     }
-    catch (QSharedPointer<ErrorBase> error)
-    {
-        QString msg = error->toString() + "\nThe application will be terminated.";
-        QMessageBox::critical(0, "Error", msg, QMessageBox::Ok);
-        return -1;
-    }
+//    catch (QSharedPointer<ErrorBase> error)
+//    {
+//        QString msg = error->toString() + "\nThe application will be terminated.";
+//        QMessageBox::critical(0, "Error", msg, QMessageBox::Ok);
+//        return -1;
+//    }
 }
 
 // -----------------------------------------------------------------------------------------------------------

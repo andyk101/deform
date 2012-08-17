@@ -78,18 +78,80 @@ int CubeSolve(double& x1, double& x2, double& x3, double a, double b, double c, 
 }
 
 // -----------------------------------------------------------------------------------------------------------
-// Поиск корней методом итераций
+// Нахождение корня func.f(x)=0 методом Итераций/Ньютона
 // ----------------------------------------------------------------------------------------------------------
-template<class Phi> double IterSolve(Phi phi, double x0, double eps)
+template<class Func> bool NewtonSolve(Func func, double& x, double x0, double eps)
 {
-    double x1 = phi(x0);
-    double x2 = phi(x1);
-    while ( fabs(x2 - x1) > eps )
+    double x1 = func.phi(x0);
+    double x2 = func.phi(x1);
+    double diff2 = fabs(x2 - x1);
+    double diff1 = 2*diff2;
+
+    while ( diff2 < diff1 && diff2 > 0 )
     {
         x1 = x2;
-        x2 = phi(x1);
+        diff1 = diff2;
+        x2 = func.phi(x1);
+        diff2 = fabs(x2 - x1);
     }
-    return x2;
+    if (diff2 > eps)
+        return false;
+
+    x = x2;
+    return true;
+}
+
+// -----------------------------------------------------------------------------------------------------------
+// Сужение интервала поиска корня методом Дихотомии и последующее нахождение корня методом Ньютона
+// ----------------------------------------------------------------------------------------------------------
+template<class Func> bool DichotomNewtonSolve(Func func, double& x, double x1, double x2, double eps)
+{
+    if (x1 > x2)
+        throw ErrorBase::create(QString("Expected x1<=x2 (x1=%1, x2=%2)")
+            .arg(x1).arg(x2));
+
+    double f1 = func.f(x1);
+    double f2 = func.f(x2);
+
+    // test Dichotom condition
+    if (boost::math::sign(f1*f2) > 0)
+        return false;
+
+    int splits_count = 0;
+    while ( fabs(x2-x1) > eps )
+    {
+        // next x
+        double x3 = (x1+x2)/2;
+
+        // test Newton condition
+        if (splits_count >= 4)
+        {
+            if (fabs(func.d2f(x1)) < pow(func.df(x1),2)/2 &&
+                fabs(func.d2f(x2)) < pow(func.df(x2),2)/2)
+            {
+                // Newton method
+                return NewtonSolve(func, x, x3, eps);
+            }
+            splits_count = 0;
+        }
+
+        // split interval
+        double f3 = func.f(x3);
+        if (boost::math::sign(f1*f3) <= 0)
+        {
+            x2 = x3;
+            f2 = f3;
+        }
+        else
+        {
+            x1 = x3;
+            f1 = f3;
+        }
+        splits_count++;
+    }
+
+    // Dichotom method
+    return (x1+x2)/2;
 }
 
 // -----------------------------------------------------------------------------------------------------------
@@ -172,8 +234,9 @@ bool Detail::isValid() const
 
 void Detail::next(double dh)
 {
+    dh = qMin(qMin(dh, m_geom[eDeg0]->m_max_dh), m_geom[eDeg45]->m_max_dh);
     m_geom[eDeg0]->next(dh);
-    m_geom[eDeg45]->next(dh);
+    //m_geom[eDeg45]->next(dh);
 }
 
 // -----------------------------------------------------------------------------------------------------------
@@ -192,144 +255,21 @@ GeomsPoint::GeomsPoint(Geom* geom, double s)
 }
 
 // -----------------------------------------------------------------------------------------------------------
-// Geom
-// -----------------------------------------------------------------------------------------------------------
-Geom::Geom(Detail* detail, int direction, int count, double dv)
-    : m_material(&*detail->material()), m_detail(detail), m_direction(direction),
-      m_points(count, GeomsPoint(this, s_0())),
-      m_valid(false)
-{
-    m_h = 0;
-    m_s_1 = s_0();
-    m_V2 = m_V6 = 0;
-    m_V5 = M_PI*s_0()*( pow(r_c(),2) - pow(r_2()-r_kp(),2) );
-    m_V7 = M_PI*s_0()*( pow(r_0(),2) - pow(r_c(),2) );
-    m_alpha = 0;
-    m_AB = r_c() - (r_2() - r_kp());
-    m_r_1 = r_c();
-    m_r_k = r_0();
-
-    m_V7_i_max = m_V6_i_max = m_V5_i_max = -1;
-    for (int i = 0; i < m_points.count(); i++)
-    {
-        GeomsPoint& pt = m_points[i];
-        double v = V0() - i*dv;
-        if (v < V1())
-            break;
-
-        pt.m_v = v;
-        pt.m_r = (i == 0) ? r_0() :
-                            sqrt(pow(m_points[i-1].m_r,2) - dv/(M_PI*s_0()));
-
-        if (pt.m_r > r_c())
-        {
-            m_V7_i_max = m_V6_i_max = m_V5_i_max = i;
-        }
-        else if (pt.m_r > r_2() - r_kp())
-        {
-            m_V5_i_max = i;
-        }
-    }
-
-    m_valid = true;
-}
-
-// -----------------------------------------------------------------------------------------------------------
-double Geom::s_1_x(double AB_x) const
-{
-    if (AB_x < 0 || AB_x > m_AB )
-        throw ErrorBase::create(QString("AB_x must be in range [0, %1], but actual is %2")
-            .arg(m_AB).arg(AB_x));
-    return s_0()+(m_s_1-s_0())*AB_x/m_AB;
-}
-
-double Geom::V2_x(double alpha_x) const
-{
-    if (alpha_x < 0 || alpha_x > m_alpha )
-        throw ErrorBase::create(QString("alpha_x must be in range [0, %1], but actual is %2")
-            .arg(m_alpha).arg(alpha_x));
-    return 4*M_PI/3*s_0()*pow(sin(alpha_x/2),2)*(3*pow(r_kp(),2) + 3*r_kp()*s_0() + pow(s_0(),2)) +
-        M_PI*alpha_x*s_0()*(2*r_kp()+s_0())*(r_2()-r_kp());
-}
-
-double Geom::V5_x(double AB_x) const
-{
-    if (AB_x < 0 || AB_x > m_AB )
-        throw ErrorBase::create(QString("AB_x must be in range [0, %1], but actual is %2")
-            .arg(m_AB).arg(AB_x));
-    double s_1_xx = s_1_x(AB_x);
-    return M_PI*AB_x/(3*cos(m_alpha)) * ( AB_x*(s_0()+2*s_1_xx) + 3*(s_0()+s_1_xx)*(r_2()-r_kp()) +
-        sin(m_alpha)*((s_0()+s_1_xx)*(3*r_kp()+2*s_0())-pow(s_1_xx,2)) );
-}
-
-double Geom::V6_x(double alpha_x) const
-{
-    if (alpha_x < 0 || alpha_x > m_alpha )
-        throw ErrorBase::create(QString("alpha_x must be in range [0, %1], but actual is %2")
-            .arg(m_alpha).arg(alpha_x));
-    return M_PI*alpha_x*m_s_1*(2*r_km()+m_s_1)*r_c() - 4.0/3*M_PI*m_s_1*pow(sin(alpha_x/2),2)*
-        (3*pow(r_km(),2)+3*r_km()*m_s_1+pow(m_s_1,2));
-}
-
-double Geom::V7_x(double r_k_x) const
-{
-    if (r_k_x < r_c() || r_k_x > m_r_k )
-        throw ErrorBase::create(QString("r_k_x must be in range [%1, %2], but actual is %3")
-            .arg(r_c()).arg(m_r_k).arg(r_k_x));
-    return M_PI*m_s_1*(pow(r_k_x,2) - pow(r_c(),2));
-}
-
-//double Geom::V6_p(double alpha1, double alpha2, double s) const
-//{
-//    return M_PI*alpha_x*s*(2*r_km()+s)*r_c() - 4.0/3*M_PI*s*pow(sin(alpha_x/2),2)*
-//        (3*pow(r_km(),2)+3*r_km()*s+pow(s,2));
-//}
-
-//double Geom::V7_p(double r1, double r2, double s) const
-//{
-//    if (r1 > r2)
-//        throw ErrorBase::create(QString("Expected r1<=r2 (r1=%1, r2=%2)")
-//            .arg(r1).arg(r2));
-
-//    if (r1 < r_c() || r2 > m_r_k)
-//        throw ErrorBase::create(QString("Expected [r1,r2]<=[%1, %2] (r1=%3, r2=%4)")
-//            .arg(r_c()).arg(m_r_k).arg(r1).arg(r2));
-
-//    return M_PI*s*(pow(r2,2) - pow(r1,2));
-//}
-
-// -----------------------------------------------------------------------------------------------------------
-// Итерационная функция для уравнения f(x)=a*sin(x/2)^2+b*x+c (по методу Ньютона phi(x)=x-f(x)/f'(x))
+// Решение уравнения a4*sin(x/2)^2+b4*x-v=0
 // ----------------------------------------------------------------------------------------------------------
-struct PhiV6
-{
-    double a, b, c;
-
-    double operator() (double x) const
-    {
-        return x - (a*pow(sin(x/2),2)+b*x+c)/(a/2*sin(x)+b);
-    }
-};
-
-// -----------------------------------------------------------------------------------------------------------
-// Решение уравнения fV6(alpha_xx)+fV5(alpha_xx)+fV2(alpha_xx)-v=0 сначала методом дихотомии, а после
-// уточнение методом Ньютона.
+// fV6(alpha_xx) <-> a4*sin(alpha_xx/2)^2+b4*alpha_xx
 // ----------------------------------------------------------------------------------------------------------
-struct SumV6V5V2
+struct FuncV6
 {
-    double a5, b5, a3, b3, c3, v;
+    double a4, b4, v;
 
     double f(double x) const
     {
-        return a5*sin(x/2)^2*cos(x)+b5*x*cos(x)+a3*sin(x)^2+b3*sin(x)-v*cos(x)+c3;
+        return a4*pow(sin(x/2),2)+b4*x-v;
     }
     double df(double x) const
     {
-        return -a5*pow(sin(x/2),2)*sin(x)-b5*x*sin(x)+(a5/4+a3)*sin(2*x)+(b5+b3)*cos(x)+v*sin(x);
-    }
-    double d2f(double x) const
-    {
-        return -a5*pow(sin(x/2),2)*cos(x)-b5*x*cos(x)+(-3*a5/2-4*a3)*pow(sin(x),2)-(2*b5+b3)*sin(x)+v*cos(x)+a5/2+2*a3;
+        return a4/2*sin(x)+b4;
     }
     double phi(double x) const
     {
@@ -338,69 +278,255 @@ struct SumV6V5V2
 };
 
 // -----------------------------------------------------------------------------------------------------------
-void Geom::calcPoint(double& r_x, double& h_z, double& alpha_x, double v_x) const
+// Решение уравнения ax*sin(x/2)^2*cos(x)+bx*x*cos(x)+a3*sin(x)^2+b3*sin(x)-v*cos(x)+c3=0
+// -----------------------------------------------------------------------------------------------------------
+// fV6(alpha_xx)+fV5(alpha_xx)+fV2(alpha_xx)=v <-> a5*sin(x/2)^2*cos(x)+b5*x*cos(x)+a3*sin(x)^2+b3*sin(x)-v*cos(x)+c3=0
+//               fV5(alpha_xx)+fV2(alpha_xx)=v <-> a1*sin(x/2)^2*cos(x)+b1*x*cos(x)+a3*sin(x)^2+b3*sin(x)-v*cos(x)+c3=0
+// ----------------------------------------------------------------------------------------------------------
+struct FuncSumV
 {
-    if (v_x < V1()+m_V2 || v_x > V0() )
-        throw ErrorBase::create(QString("v_x must be in range [%1, %2], but actual is %3")
-            .arg(V1()+m_V2).arg(V0()).arg(v_x));
+    double ax, bx, a3, b3, c3, v;
 
-    // V7
-    if (m_V7 > 0 && v_x >= V0()-m_V7)
+    FuncSumV(){}
+    FuncSumV(double ax_, double bx_, double a3_, double b3_, double c3_, double v_)
+        : ax(ax_), bx(bx_), a3(a3_), b3(b3_), c3(c3_), v(v_)
     {
-        alpha_x = 0;
-        r_x = sqrt((v_x-V0()+m_V7)/(M_PI*m_s_1)+pow(r_c(),2));
-        h_z = 0;
     }
-    // V6
-    else if (v_x >= V1()+m_V2+m_V5)
+    double f(double x) const
     {
-        // f(x)=a*sin(x/2)^2+b*x+c
-        PhiV6 phi;
-        phi.a = -4.0/3*M_PI*m_s_1*(3*pow(r_km(),2)+3*r_km()*m_s_1+pow(m_s_1,2));
-        phi.b = M_PI*m_s_1*(2*r_km()+m_s_1)*r_c();
-        phi.c = v_x-(V1()+m_V2+m_V5+V6_x(m_alpha));
-
-        alpha_x = IterSolve(phi, M_PI/4, 0.000000000001);
-        r_x = r_c()-(r_km()+s_0()/2)*sin(alpha_x);
-        h_z = (r_km()+s_0()/2)*(1-cos(alpha_x));
+        return ax*pow(sin(x/2),2)*cos(x)+bx*x*cos(x)+a3*pow(sin(x),2)+b3*sin(x)-v*cos(x)+c3;
     }
-    // V5
-    else if (v_x >= V1()+m_V2)
+    double df(double x) const
     {
-        // fV5(AB_xx,fs_1(AB_xx))=v-V1-V2) <-> { a1*AB_xx^3+b1*AB_xx^2+c1*AB_xx+d1=0, 0<=AB_xx<=AB }
-        double a = M_PI*(m_s_1-s_0())*(-2*m_AB+sin(m_alpha)*(m_s_1-s_0()));
-        double b = -3*M_PI*m_AB*(m_AB*s_0()+(m_s_1-s_0())*((r_2()-r_kp())+sin(m_alpha)*r_kp()));
-        double c = 3*M_PI*pow(m_AB,2)*s_0()*(-2*r_2()+2*r_kp()-sin(m_alpha)*(2*r_kp()+s_0()));
-        double d = 3*cos(m_alpha)*pow(m_AB,2)*(v_x-V1()-m_V2);
+        return -ax*pow(sin(x/2),2)*sin(x)-bx*x*sin(x)+(ax/4+a3)*sin(2*x)+(bx+b3)*cos(x)+v*sin(x);
+    }
+    double d2f(double x) const
+    {
+        return -ax*pow(sin(x/2),2)*cos(x)-bx*x*cos(x)+(-3*ax/2-4*a3)*pow(sin(x),2)-(2*bx+b3)*sin(x)+v*cos(x)+ax/2+2*a3;
+    }
+    double phi(double x) const
+    {
+        return x - f(x)/df(x);
+    }
+};
 
-        double AB_x, x1,x2,x3;
-        int roots = CubeSolve(x1,x2,x3, a,b,c,d);
-        if (roots>=1 && 0<=x1 && x1<=m_AB)
-            AB_x = x1;
-        else if (roots>=2 && 0<=x2 && x2<=m_AB)
-            AB_x = x2;
-        else if (roots>=3 && 0<=x3 && x3<=m_AB)
-            AB_x = x3;
-        else
+// -----------------------------------------------------------------------------------------------------------
+// Geom
+// -----------------------------------------------------------------------------------------------------------
+Geom::Geom(Detail* detail, int direction, int count, double dv)
+    : m_material(&*detail->material()), m_detail(detail), m_direction(direction),
+      m_points(count, GeomsPoint(this, s_0())),
+      m_valid(false)
+{
+    m_h = m_max_dh = 0;
+    m_s_1 = s_0();
+    m_V2 = m_V6 = 0;
+    m_V5 = M_PI*s_0()*( pow(r_c(),2) - pow(r_2()-r_kp(),2) );
+    m_V7 = M_PI*s_0()*( pow(r_0(),2) - pow(r_c(),2) );
+    m_V5_bound = V0()-m_V7-m_V6-m_V5;
+    m_V6_bound = V0()-m_V7-m_V6;
+    m_V7_bound = V0()-m_V7;
+    m_alpha = 0;
+    m_AB = r_c() - (r_2() - r_kp());
+    m_r_1 = r_c();
+    m_r_k = r_0();
+
+    // Т.к. объемы считаются не точно, точка переходит на следующий участок чуть раньше.
+    m_V_eps = 0.00001;
+    m_V7_i_max = m_V6_i_max = m_V5_i_max = -1;
+    for (int i = 0; i < m_points.count(); i++)
+    {
+        GeomsPoint& pt = m_points[i];
+        double v = V0() - i*dv;
+        switch (eV_x(v))
         {
-            throw ErrorBase::create(QString("Cannot find AB_x for v_x=%1").arg(v_x));
+            case eV7:
+                m_V7_i_max = m_V6_i_max = m_V5_i_max = i;
+                break;
+            case eV5:
+                m_V5_i_max = i;
+                break;
+            default:
+                goto Break;
         }
-        alpha_x = 0;
-        r_x = m_r_1 - m_AB + AB_x;
-        h_z = m_h - (r_kp()+s_0()/2)*(1-cos(m_alpha)) - tan(m_alpha)*AB_x;
+
+        pt.m_v = v;
+        pt.m_r = (i == 0) ? r_0() :
+                            sqrt(pow(m_points[i-1].m_r,2) - dv/(M_PI*s_0()));
+    }
+Break:
+
+    recalc_V_coeff();
+    recalc_max_dh();
+    m_valid = true;
+}
+
+void Geom::recalc_V_coeff()
+{
+    m_a1 = 4*M_PI/3*s_0()*(3*pow(r_kp(),2)+3*r_kp()*s_0()+pow(s_0(),2));
+    m_b1 = M_PI*s_0()*(2*r_kp()+s_0())*(r_2()-r_kp());
+
+    m_a2 = r_km()+r_kp()+s_0();
+    m_b2 = r_km()*s_0()+2*r_km()*m_s_1-2*r_kp()*s_0()-r_kp()*m_s_1-pow(s_0(),2)+pow(m_s_1,2);
+    m_c2 = -r_c()+r_2()-r_kp();
+    m_d2 = -r_c()*s_0()-2*r_c()*m_s_1-2*r_2()*s_0()-r_2()*m_s_1+2*r_kp()*s_0()+m_s_1*r_kp();
+
+    m_a3 = M_PI/3*m_a2*m_b2;
+    m_b3 = M_PI/3*(m_a2*m_d2+m_c2*m_b2);
+    m_c3 = M_PI/3*m_c2*m_d2;
+
+    m_a4 = -4*M_PI/3*m_s_1*(3*pow(r_km(),2)+3*r_km()*m_s_1+pow(m_s_1,2));
+    m_b4 = M_PI*m_s_1*(2*r_km()+m_s_1)*r_c();
+
+    m_a5 = m_a1+m_a4;
+    m_b5 = m_b1+m_b4;
+}
+
+void Geom::recalc_max_dh()
+{
+    if (m_V6_i_max < 0)
+    {
+        m_max_dh = 0;
+        return;
+    }
+
+    m_max_dh = std::numeric_limits<double>::max();
+    if (m_V7_i_max >= 0)
+    {
+        double dv = V7_x(m_points[m_V7_i_max].m_r);
+
+        double alpha_xx = 0;
+        FuncSumV func(m_a5, m_b5, m_a3, m_b3, m_c3, m_V2+m_V5+m_V6+dv);
+        if(!DichotomNewtonSolve(func, alpha_xx, m_alpha, M_PI/2, 0.000000000001))
+            throw ErrorBase::create(QString("Cannot find alpha_x for dv=%1").arg(dv));
+
+        double AB = AB_x(alpha_xx);
+        double vx = V6_x(alpha_xx)+V5_x(alpha_xx, AB)+V2_x(alpha_xx);
+        double eps = fabs(func.v - vx);
+        double max_dh = h_x(alpha_xx, AB) - m_h;
+        m_max_dh = qMin(m_max_dh, max_dh);
+    }
+
+    if (m_V6_i_max > m_V7_i_max)
+    {
+        double dv = m_V6 - V6_x(m_points[m_V6_i_max].m_alpha);
+
+        double alpha_xx = 0;
+        FuncSumV func(m_a1, m_b1, m_a3, m_b3, m_c3, m_V2+m_V5+dv);
+        if(!DichotomNewtonSolve(func, alpha_xx, m_alpha, M_PI/2, 0.000000000001))
+            throw ErrorBase::create(QString("Cannot find alpha_x for dv=%1").arg(dv));
+
+        double AB = AB_x(alpha_xx);
+        double vx = V5_x(alpha_xx, AB)+V2_x(alpha_xx);
+        double eps = fabs(func.v - vx);
+        double max_dh = h_x(alpha_xx, AB) - m_h;
+        m_max_dh = qMin(m_max_dh, max_dh);
     }
 }
 
-double Geom::find_max_dv()
+// -----------------------------------------------------------------------------------------------------------
+int Geom::eV_x(double v_xx) const
 {
-    double dv = 0;
-    if (m_V7_i_max >= 0)
+    return           (v_xx > V0()) ? eVCount :
+     (v_xx > m_V7_bound + m_V_eps) ? eV7 :
+     (v_xx > m_V6_bound + m_V_eps) ? eV6 :
+     (v_xx > m_V5_bound + m_V_eps) ? eV5 :
+                                     eVCount;
+}
+
+double Geom::AB_x(double alpha_xx) const
+{
+    return r_c()-r_2()+r_kp()-(sin(alpha_xx)*(r_km()+r_kp()+s_0()));
+}
+
+double Geom::h_x(double alpha_xx, double AB_xx) const
+{
+    return AB_xx*tan(alpha_xx)+(1-cos(alpha_xx))*(r_km()+r_kp()+s_0());
+}
+
+double Geom::V2_x(double alpha_xx) const
+{
+    return 4*M_PI/3*s_0()*pow(sin(alpha_xx/2),2)*(3*pow(r_kp(),2) + 3*r_kp()*s_0() + pow(s_0(),2)) +
+        M_PI*alpha_xx*s_0()*(2*r_kp()+s_0())*(r_2()-r_kp());
+}
+
+double Geom::V5_x(double alpha_xx, double AB_xx) const
+{
+    return M_PI*AB_xx/(3*cos(alpha_xx)) * ( AB_xx*(s_0()+2*m_s_1) + 3*(s_0()+m_s_1)*(r_2()-r_kp()) +
+        sin(alpha_xx)*((s_0()+m_s_1)*(3*r_kp()+2*s_0())-pow(m_s_1,2)) );
+}
+
+double Geom::V6_x(double alpha_xx) const
+{
+    return M_PI*alpha_xx*m_s_1*(2*r_km()+m_s_1)*r_c() - 4.0/3*M_PI*m_s_1*pow(sin(alpha_xx/2),2)*
+        (3*pow(r_km(),2)+3*r_km()*m_s_1+pow(m_s_1,2));
+}
+
+double Geom::V7_x(double r_k_xx) const
+{
+    return M_PI*m_s_1*(pow(r_k_xx,2) - pow(r_c(),2));
+}
+
+// -----------------------------------------------------------------------------------------------------------
+void Geom::calcPoint(double& r_x, double& h_z, double& alpha_x, double v_x) const
+{
+    if (m_V7_bound < v_x && v_x <= m_V7_bound + m_V_eps)
+        v_x = m_V7_bound;
+    else if (m_V6_bound < v_x && v_x <= m_V6_bound + m_V_eps)
+        v_x = m_V6_bound;
+    else if (m_V5_bound < v_x && v_x <= m_V5_bound + m_V_eps)
+        v_x = m_V5_bound;
+
+    switch(eV_x(v_x))
     {
-        dv = V7_x(m_points[m_V7_i_max].m_r);
-    }
-    if (m_V6_i_max > m_V7_i_max)
-    {
-        //dv = V6_x(alpha_x) - V6_x(m_points[m_V6_i_max].m_alpha);
+        case eVCount:
+            throw ErrorBase::create(QString("v_x must be in range [%1, %2], but actual is %3")
+                .arg(m_V5_bound).arg(V0()).arg(v_x));
+
+        case eV7:
+            alpha_x = 0;
+            r_x = sqrt((v_x-V0()+m_V7)/(M_PI*m_s_1)+pow(r_c(),2));
+            h_z = 0;
+            break;
+
+        case eV6:
+        {
+            FuncV6 func;
+            func.a4 = m_a4;
+            func.b4 = m_b4;
+            func.v = V0()-m_V7-v_x;
+
+            if (!NewtonSolve(func, alpha_x, M_PI/4, 0.000000000001))
+                throw ErrorBase::create(QString("Cannot find alpha_x for v_x=%1").arg(v_x));
+
+            r_x = r_c()-(r_km()+s_0()/2)*sin(alpha_x);
+            h_z = (r_km()+s_0()/2)*(1-cos(alpha_x));
+            break;
+        }
+        case eV5:
+        {
+            // fV5(AB_xx,fs_1(AB_xx))=v-V1-V2) <-> { a1*AB_xx^3+b1*AB_xx^2+c1*AB_xx+d1=0, 0<=AB_xx<=AB }
+            double a = M_PI*(m_s_1-s_0())*(-2*m_AB+sin(m_alpha)*(m_s_1-s_0()));
+            double b = -3*M_PI*m_AB*(m_AB*s_0()+(m_s_1-s_0())*((r_2()-r_kp())+sin(m_alpha)*r_kp()));
+            double c = 3*M_PI*pow(m_AB,2)*s_0()*(-2*r_2()+2*r_kp()-sin(m_alpha)*(2*r_kp()+s_0()));
+            double d = 3*cos(m_alpha)*pow(m_AB,2)*(v_x-V1()-m_V2);
+
+            double AB_x, x1,x2,x3;
+            int roots = CubeSolve(x1,x2,x3, a,b,c,d);
+            if (roots>=1 && 0<=x1 && x1<=m_AB)
+                AB_x = x1;
+            else if (roots>=2 && 0<=x2 && x2<=m_AB)
+                AB_x = x2;
+            else if (roots>=3 && 0<=x3 && x3<=m_AB)
+                AB_x = x3;
+            else
+                throw ErrorBase::create(QString("Cannot find AB_x for v_x=%1").arg(v_x));
+
+            alpha_x = 0;
+            r_x = m_r_1 - m_AB + AB_x;
+            h_z = m_h - (r_kp()+s_0()/2)*(1-cos(m_alpha)) - tan(m_alpha)*AB_x;
+            break;
+        }
     }
 }
 
@@ -409,6 +535,13 @@ void Geom::next(double dh)
     if (!isValid())
         return;
 
+    // m_h
+    dh = qMin(dh, m_max_dh);
+    if (dh <= 0)
+    {
+        m_valid = false;
+        return;
+    }
     m_h = m_h + dh;
 
     // -------------------------------------------------------------------------------------------------------
@@ -454,14 +587,15 @@ void Geom::next(double dh)
     m_r_1 = r_c() - (r_km()+s_0()/2)*sin(m_alpha);
 
     // -------------------------------------------------------------------------------------------------------
-    // (s_0, s_1, alpha, AB, r_1) -> (V2, V5, V6, V7)
+    // (s_0, s_1, alpha, AB, r_1) -> (V2, V5, V6, V7, V5_bound, V6_bound, V7_bound)
     m_V2 = V2_x(m_alpha);
-    m_V5 = V5_x(m_AB);
+    m_V5 = V5_x(m_alpha, m_AB);
     m_V6 = V6_x(m_alpha);
     if (V0() < V1()+m_V2+m_V5)
     {
-        m_valid = false;
-        return;
+        m_V5 = V0() - (V1()+m_V2);
+        m_V6 = 0;
+        m_V7 = 0;
     }
     else if (V0() < V1()+m_V2+m_V5+m_V6)
     {
@@ -472,29 +606,30 @@ void Geom::next(double dh)
     {
         m_V7 = V0() - (V1()+m_V2+m_V5+m_V6);
     }
+    m_V5_bound = V0()-m_V7-m_V6-m_V5;
+    m_V6_bound = V0()-m_V7-m_V6;
+    m_V7_bound = V0()-m_V7;
 
     // -------------------------------------------------------------------------------------------------------
     // (points_prev) -> (r_k, points, V7_i_max, V6_i_max, V5_i_max)
     int V5_i_max_prev = m_V5_i_max;
     m_V7_i_max = m_V6_i_max = m_V5_i_max = -1;
-    for (int i = 0; i < V5_i_max_prev; i++)
+    for (int i = 0; i <= V5_i_max_prev; i++)
     {
         GeomsPoint& pt = m_points[i];
-        if (pt.m_v >= V0() - m_V7)
+        switch (eV_x(pt.m_v))
         {
-            m_V7_i_max = m_V6_i_max = m_V5_i_max = i;
-        }
-        else if (pt.m_v >= V0() - (m_V7+m_V6))
-        {
-            m_V6_i_max = m_V5_i_max = i;
-        }
-        else if (pt.m_v >= V0() - (m_V7+m_V6+m_V5))
-        {
-            m_V5_i_max = i;
-        }
-        else
-        {
-            break;
+            case eV7:
+                m_V7_i_max = m_V6_i_max = m_V5_i_max = i;
+                break;
+            case eV6:
+                m_V6_i_max = m_V5_i_max = i;
+                break;
+            case eV5:
+                m_V5_i_max = i;
+                break;
+            case eVCount:
+                goto Break;
         }
 
         calcPoint(pt.m_r, pt.m_h, pt.m_alpha, pt.m_v);
@@ -502,9 +637,10 @@ void Geom::next(double dh)
         if (i == 0)
             m_r_k = pt.m_r;
     }
+Break:
 
-    // -------------------------------------------------------------------------------------------------------
-    // points -> bounds
+    recalc_V_coeff();
+    recalc_max_dh();
 }
 
 // -----------------------------------------------------------------------------------------------------------
@@ -545,9 +681,7 @@ QSharedPointer<Process> Process::clone() const
 
 void Process::exec()
 {
-    m_detail->first(m_v_parts);
-    m_detail->next(27.0);
-    //for (m_detail->first_h(m_v_parts); m_detail->isValid(); m_detail->next_h())
+    for (m_detail->first(m_v_parts); m_detail->isValid(); m_detail->next(27))
     {
         // ...
     }
