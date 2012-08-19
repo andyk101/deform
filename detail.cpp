@@ -165,8 +165,8 @@ QSharedPointer<Material> Material::find(QString name)
 void Material::parse(XmlParser& parser, QDomElement& element, bool optional)
 {
     parser.xmlNodeVarChange<QString>(m_name,element, "Name",XmlParser::nodeAttr, optional);
-    parser.xmlNodeVarChange<double>(m_R0,   element, "R0",  XmlParser::nodeAttr, optional);
-    parser.xmlNodeVarChange<double>(m_R45,  element, "R45", XmlParser::nodeAttr, optional);
+    parser.xmlNodeVarChange<double>(m_R[eDeg0],  element, "R0",  XmlParser::nodeAttr, optional);
+    parser.xmlNodeVarChange<double>(m_R[eDeg45], element, "R45", XmlParser::nodeAttr, optional);
     parser.xmlNodeVarChange<double>(m_B,    element, "B",   XmlParser::nodeAttr, optional);
     parser.xmlNodeVarChange<double>(m_m,    element, "m",   XmlParser::nodeAttr, optional);
     parser.xmlNodeVarChange<double>(m_Omega,element, "Omega", XmlParser::nodeAttr, optional);
@@ -182,6 +182,23 @@ void Material::parse(XmlParser& parser, QDomElement& element, bool optional)
 QSharedPointer<Detail> Detail::find(QString name)
 {
     return qobject_cast<DeformApp*>(qApp)->element<Detail>(name);
+}
+
+Detail& Detail::operator= (const Detail& detail)
+{
+    m_name = detail.m_name;
+    m_material = detail.m_material;
+    m_geom[eDeg0].clear();
+    m_geom[eDeg45].clear();
+    m_r_0 = detail.m_r_0;
+    m_m_d = detail.m_m_d;
+    m_r_kp = detail.m_r_kp;
+    m_r_km = detail.m_r_km;
+    m_s_0 = detail.m_s_0;
+    m_z = detail.m_z;
+    m_mu = detail.m_mu;
+    m_r_2 = m_r_c = m_r_max = m_V0 = m_V1 = 0;
+    return *this;
 }
 
 void Detail::parse(XmlParser& parser, QDomElement& element, bool optional)
@@ -208,6 +225,16 @@ QSharedPointer<Detail> Detail::clone() const
     return det;
 }
 
+void Detail::init()
+{
+    m_name = "";
+    m_material.clear();
+    m_geom[eDeg0].clear();
+    m_geom[eDeg45].clear();
+    m_r_0 = m_m_d = m_r_kp = m_r_km = m_s_0 = m_z = m_mu = 0;
+    m_r_2 = m_r_c = m_r_max = m_V0 = m_V1 = 0;
+}
+
 void Detail::first(int v_parts)
 {
     m_r_2 = m_m_d*m_r_0 - m_z/2;
@@ -232,11 +259,22 @@ bool Detail::isValid() const
     return m_geom[eDeg0]->isValid() && m_geom[eDeg45]->isValid();
 }
 
-void Detail::next(double dh)
+double Detail::h() const
+{
+    return m_geom[eDeg0]->m_h;
+}
+
+void Detail::next_h(double dh)
 {
     dh = qMin(qMin(dh, m_geom[eDeg0]->m_max_dh), m_geom[eDeg45]->m_max_dh);
-    m_geom[eDeg0]->next(dh);
-    //m_geom[eDeg45]->next(dh);
+    m_geom[eDeg0]->next_h(dh);
+    m_geom[eDeg45]->next_h(dh);
+}
+
+void Detail::calcContext(QSharedPointer<Geom> prevGeom[eDegCount], bool calc_s)
+{
+    m_geom[eDeg0]->calcContext(prevGeom, calc_s);
+    m_geom[eDeg45]->calcContext(prevGeom, calc_s);
 }
 
 // -----------------------------------------------------------------------------------------------------------
@@ -401,8 +439,8 @@ void Geom::recalc_max_dh()
             throw ErrorBase::create(QString("Cannot find alpha_x for dv=%1").arg(dv));
 
         double AB = AB_x(alpha_xx);
-        double vx = V6_x(alpha_xx)+V5_x(alpha_xx, AB)+V2_x(alpha_xx);
-        double eps = fabs(func.v - vx);
+        // double vx = V6_x(alpha_xx)+V5_x(alpha_xx, AB)+V2_x(alpha_xx);
+        // double eps = fabs(func.v - vx);
         double max_dh = h_x(alpha_xx, AB) - m_h;
         m_max_dh = qMin(m_max_dh, max_dh);
     }
@@ -417,8 +455,8 @@ void Geom::recalc_max_dh()
             throw ErrorBase::create(QString("Cannot find alpha_x for dv=%1").arg(dv));
 
         double AB = AB_x(alpha_xx);
-        double vx = V5_x(alpha_xx, AB)+V2_x(alpha_xx);
-        double eps = fabs(func.v - vx);
+        // double vx = V5_x(alpha_xx, AB)+V2_x(alpha_xx);
+        // double eps = fabs(func.v - vx);
         double max_dh = h_x(alpha_xx, AB) - m_h;
         m_max_dh = qMin(m_max_dh, max_dh);
     }
@@ -530,7 +568,7 @@ void Geom::calcPoint(double& r_x, double& h_z, double& alpha_x, double v_x) cons
     }
 }
 
-void Geom::next(double dh)
+void Geom::next_h(double dh)
 {
     if (!isValid())
         return;
@@ -643,6 +681,102 @@ Break:
     recalc_max_dh();
 }
 
+void Geom::calcContext(QSharedPointer<Geom> prevGeom[eDegCount], bool calc_s)
+{
+    double f = -1/(1+R());
+    double r_mc = r_km() + s_0()/2;
+    double a = r_c()/r_mc;
+
+    for (int i = 0; i <= m_V5_i_max; i++)
+    {
+        GeomsPoint& pt = m_points[i];
+        GeomsPoint& pt_prev_r = m_points[qMax(0, i-1)];
+        GeomsPoint& pt_prev_h = prevGeom[m_direction]->m_points[i];
+
+        // epsilon_phi, epsilon_i
+        double d_epsilon_phi = (pt.m_r - pt_prev_h.m_r) / pt_prev_h.m_r;
+        double d_epsilon_z = f*d_epsilon_phi;
+        double d_epsilon_r = -(d_epsilon_phi + d_epsilon_z);
+        double d_epsilon_i = sqrt(2*(2+R())/3)/(2*R()+1)*sqrt(R()*pow((d_epsilon_r-d_epsilon_phi),2)+
+            pow((d_epsilon_phi*(1+R())+R()*d_epsilon_r),2)+pow((d_epsilon_r*(1+R())+R()*d_epsilon_phi),2));
+        pt.m_epsilon_phi += d_epsilon_phi;
+        pt.m_epsilon_i += d_epsilon_i;
+
+        // sigma_i, sigma_s
+        double sigma_i = B()*pow(pt.m_epsilon_i,m());
+        if (m_direction == eDeg0)
+            pt.m_sigma_s = sqrt(2*(2+R(eDeg0))/(3*(R(eDeg0)+1)))*sigma_i;
+        else
+            pt.m_sigma_s = sqrt((2+R(eDeg0))/(2*(1+R(eDeg45))))*sigma_i;
+
+        // sigma_r
+        if (i == 0)
+            pt.m_sigma_r = 0;
+        else if (i <= m_V7_i_max+1)
+            pt.m_sigma_r = pt_prev_r.m_sigma_r - (pt.m_r-pt_prev_r.m_r)/pt_prev_r.m_r*
+                    (pt_prev_r.m_sigma_r*(1+f) - pt_prev_r.m_sigma_phi);
+        else if (i <= m_V6_i_max+1)
+        {
+            pt.m_sigma_r = pt_prev_r.m_sigma_r*(1 - (pt.m_r-pt_prev_h.m_r)/pt_prev_h.m_r*f) +
+                (pt.m_alpha - pt_prev_r.m_alpha)*(pt_prev_r.m_sigma_r*(cos(pt_prev_r.m_alpha)/(a-sin(pt_prev_r.m_alpha))+mu()) -
+                pt_prev_r.m_sigma_phi*(cos(pt_prev_r.m_alpha)+mu()*sin(pt_prev_r.m_alpha))/(a-sin(pt_prev_r.m_alpha)));
+        }
+        else if (i <= m_V5_i_max+1)
+            pt.m_sigma_r = pt_prev_r.m_sigma_r - (pt.m_r-pt_prev_r.m_r)/pt_prev_r.m_r*
+                (pt_prev_r.m_sigma_r*(1+f) - pt_prev_r.m_sigma_phi);
+
+        if (i == m_V7_i_max+1)
+            pt.m_sigma_r += pt.m_sigma_s*pt.m_s/(4*r_mc);
+
+        if (i == m_V6_i_max+1)
+            pt.m_sigma_r += pt.m_sigma_s*pt.m_s/(4*r_mc);
+
+        // sigma_phi
+        double sigma_s90 = m_detail->geom(eDeg0)->m_points[i].m_sigma_s;
+        double x1,x2, a1,b1,c1;
+        if (m_direction == eDeg0)
+        {
+            a1 = 1;
+            b1 = -2*R(eDeg0)*pt.m_sigma_r/(1+R(eDeg0));
+            c1 = pow(pt.m_sigma_r,2)-pow(sigma_s90,2);
+        }
+        else
+        {
+            a1 = R(eDeg45)+1;
+            b1 = -2*R(eDeg45)*pt.m_sigma_r;
+            c1 = (1+R(eDeg45))*pow(pt.m_sigma_r,2)-(1+R(eDeg0))*pow(sigma_s90,2);
+        }
+        int roots = SquareSolve(x1,x2, a1,b1,c1);
+        if (roots>=1 && x1<0)
+            pt.m_sigma_phi = x1;
+        else if (roots>=2 && x2<0)
+            pt.m_sigma_phi = x2;
+        else
+        {
+            pt.m_sigma_phi = 0;
+            m_valid = false;
+        }
+
+        // s
+        if (calc_s)
+        {
+            pt.m_s_expr += -(pt.m_sigma_r+pt.m_sigma_phi)/(pt.m_sigma_r*R()-pt.m_sigma_phi*(1+R()))*
+                (pt.m_r-pt_prev_h.m_r)/pt_prev_h.m_r;
+            pt.m_s = s_0()*exp(-pt.m_s_expr);
+        }
+
+        // omega_e
+        double alpha = (m_direction == eDeg0) ? 0.0    : M_PI/4;
+        double beta  = (m_direction == eDeg0) ? M_PI/2 : M_PI/4;
+        double sigma = (pt.m_sigma_r+pt.m_sigma_phi)/3;
+        double eps_i_pr = Omega()*exp(U()*sigma/sigma_i)*(aa0()+aa1()*cos(alpha)+aa2()*cos(beta));
+        pt.m_omega_e += d_epsilon_i/eps_i_pr;
+
+        // next
+        f = -(pt.m_sigma_r+pt.m_sigma_phi)/(pt.m_sigma_phi*(1+R())-R()*pt.m_sigma_r);
+    }
+}
+
 // -----------------------------------------------------------------------------------------------------------
 // Process
 // -----------------------------------------------------------------------------------------------------------
@@ -654,6 +788,7 @@ QSharedPointer<Process> Process::find(QString name)
 Process& Process::operator= (const Process& proc)
 {
     m_name = proc.m_name;
+    m_prev_geoms.clear();
     m_detail = proc.m_detail->clone();
     m_v_parts = proc.m_v_parts;
     m_calc_s = proc.m_calc_s;
@@ -681,9 +816,15 @@ QSharedPointer<Process> Process::clone() const
 
 void Process::exec()
 {
-    for (m_detail->first(m_v_parts); m_detail->isValid(); m_detail->next(27))
+    m_prev_geoms.clear();
+    for (m_detail->first(m_v_parts); m_detail->isValid(); m_detail->next_h(27))
     {
+        if (m_detail->h() > 0)
+            m_detail->calcContext(m_prev_geoms.back().m_geoms, m_calc_s);
+
         // ...
+
+        m_prev_geoms << GeomPair(m_detail->geom(eDeg0)->clone(), m_detail->geom(eDeg45)->clone());
     }
 }
 

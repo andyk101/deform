@@ -8,11 +8,11 @@
 // -----------------------------------------------------------------------------------------------------------
 // Material
 // -----------------------------------------------------------------------------------------------------------
+enum eDirection { eDeg0, eDeg45, eDegCount };
 struct Material
 {
     QString m_name;
-    double m_R0;
-    double m_R45;
+    double m_R[eDegCount];
     double m_B;
     double m_m;
     double m_Omega;
@@ -31,7 +31,6 @@ public:
 // -----------------------------------------------------------------------------------------------------------
 // Detail - деталь при шаге h
 // -----------------------------------------------------------------------------------------------------------
-enum eDirection { eDeg0, eDeg45, eDegCount };
 struct Geom;
 class Detail
 {
@@ -41,7 +40,7 @@ public:
 private:
     QString m_name;
     QSharedPointer<Material> m_material;
-    QVector< QSharedPointer<Geom> > m_geom;
+    QSharedPointer<Geom> m_geom[eDegCount];
 
 public:
     // парсинг
@@ -61,7 +60,9 @@ public:
     double m_V1;
 
 public:
-    Detail() : m_geom(eDegCount) {}
+    Detail() { init(); }
+    Detail& operator= (const Detail& detail);
+    Detail(const Detail& detail) { init(); *this = detail; }
     void parse(XmlParser& parser, QDomElement& element, bool optional = false);
     QSharedPointer<Detail> clone() const;
 
@@ -70,9 +71,13 @@ public:
     void setMaterial(QSharedPointer<Material> material) { m_material = material; }
     QSharedPointer<Geom> geom(int direction) { return m_geom[direction]; }
 
+    void init();
     void first(int v_parts);
     bool isValid() const;
-    void next(double dh);
+
+    double h() const;
+    void next_h(double dh);
+    void calcContext(QSharedPointer<Geom> prevGeom[eDegCount], bool calc_s);
 };
 
 // -----------------------------------------------------------------------------------------------------------
@@ -146,8 +151,8 @@ struct Geom
     bool m_valid;
 
     // материал
-    double R0() const { return m_material->m_R0; }
-    double R45() const { return m_material->m_R45; }
+    double R(int direction) const { return m_material->m_R[direction]; }
+    double R() const { return m_material->m_R[m_direction]; }
     double B() const { return m_material->m_B; }
     double m() const { return m_material->m_m; }
     double Omega() const { return m_material->m_Omega; }
@@ -183,10 +188,12 @@ struct Geom
 
     void calcPoint(double& r_x, double& h_x, double& alpha_x, double v_x) const;
     Geom(Detail* detail, int direction, int count, double dv);
+    QSharedPointer<Geom> clone() const { return QSharedPointer<Geom>(new Geom(*this)); }
     void recalc_V_coeff();
     void recalc_max_dh();
 
-    void next(double dh);
+    void next_h(double dh);
+    void calcContext(QSharedPointer<Geom> prevGeom[eDegCount], bool calc_s);
 };
 
 // -----------------------------------------------------------------------------------------------------------
@@ -196,11 +203,21 @@ class Process
 {
 public:
     static QSharedPointer<Process> find(QString name);
+    struct GeomPair
+    {
+        QSharedPointer<Geom> m_geoms[eDegCount];
+
+        GeomPair(QSharedPointer<Geom> geom0, QSharedPointer<Geom> geom45)
+        {
+            m_geoms[eDeg0] = geom0;
+            m_geoms[eDeg45] = geom45;
+        }
+    };
 
 private:
     QString m_name;
+    QList< GeomPair > m_prev_geoms;
     QSharedPointer<Detail> m_detail;
-
     int m_v_parts;
     bool m_calc_s;
 
