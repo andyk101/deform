@@ -560,7 +560,7 @@ void Geom::calcPoint(double& r_x, double& h_z, double& alpha_x, double v_x) cons
             else
                 throw ErrorBase::create(QString("Cannot find AB_x for v_x=%1").arg(v_x));
 
-            alpha_x = 0;
+            alpha_x = m_alpha;
             r_x = m_r_1 - m_AB + AB_x;
             h_z = m_h - (r_kp()+s_0()/2)*(1-cos(m_alpha)) - tan(m_alpha)*AB_x;
             break;
@@ -816,14 +816,14 @@ QSharedPointer<Process> Process::clone() const
 
 void Process::exec()
 {
+    double end_h = m_detail->m_r_km + m_detail->m_r_kp + m_detail->m_s_0;
     m_prev_geoms.clear();
-    for (m_detail->first(m_v_parts); m_detail->isValid(); m_detail->next_h(27))
+    for (m_detail->first(m_v_parts); m_detail->isValid() && m_detail->h() < end_h; m_detail->next_h(end_h - m_detail->h()))
     {
         if (m_detail->h() > 0)
             m_detail->calcContext(m_prev_geoms.back().m_geoms, m_calc_s);
 
         // ...
-
         m_prev_geoms << GeomPair(m_detail->geom(eDeg0)->clone(), m_detail->geom(eDeg45)->clone());
     }
 }
