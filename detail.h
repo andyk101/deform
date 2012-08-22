@@ -78,6 +78,7 @@ public:
     double h() const;
     void next_h(double dh);
     void calcContext(QSharedPointer<Geom> prevGeom[eDegCount], bool calc_s);
+    void recalc_r_max();
 };
 
 // -----------------------------------------------------------------------------------------------------------
@@ -102,8 +103,9 @@ struct GeomsPoint
     double m_s_expr;
     double m_omega_e;
 
-    GeomsPoint();
-    GeomsPoint(Geom* geom, double s);
+    GeomsPoint() { init(0,0); }
+    GeomsPoint(Geom* geom, double s) { init(geom,s); }
+    void init(Geom* geom, double s);
 };
 
 // -----------------------------------------------------------------------------------------------------------
@@ -116,6 +118,7 @@ struct Geom
     Detail* m_detail;     // деталь
     int m_direction;      // направление d
     QVector<GeomsPoint> m_points;
+    GeomsPoint m_pt_rmax;
 
     double m_h, m_max_dh;
 
@@ -191,6 +194,7 @@ struct Geom
     QSharedPointer<Geom> clone() const { return QSharedPointer<Geom>(new Geom(*this)); }
     void recalc_V_coeff();
     void recalc_max_dh();
+    void recalc_r_max();
 
     void next_h(double dh);
     void calcContext(QSharedPointer<Geom> prevGeom[eDegCount], bool calc_s);
@@ -207,6 +211,7 @@ public:
     {
         QSharedPointer<Geom> m_geoms[eDegCount];
 
+        GeomPair() {}
         GeomPair(QSharedPointer<Geom> geom0, QSharedPointer<Geom> geom45)
         {
             m_geoms[eDeg0] = geom0;
@@ -216,8 +221,9 @@ public:
 
 private:
     QString m_name;
-    QList< GeomPair > m_prev_geoms;
+    QList< GeomPair > m_prev_geoms; // для отладки
     QSharedPointer<Detail> m_detail;
+    GeomsPoint m_pt_r_max[eDegCount];
     int m_v_parts;
     bool m_calc_s;
 

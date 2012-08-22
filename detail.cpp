@@ -1,6 +1,11 @@
 #include "detail.h"
 #include "deform_app.h"
 #include <boost/math/special_functions/sign.hpp>
+#include <boost/math/special_functions/sign.hpp>
+#include <boost/numeric/ublas/matrix.hpp>
+
+using namespace boost::math;
+//using namespace boost::ublas;
 
 // ----------------------------------------------------------------------------------------------------------
 // Решение квадратного уравнения a*x^2+b*x+c=0, если a,b,c - числа с плав. точкой.
@@ -52,7 +57,7 @@ int CubeSolve(double& x1, double& x2, double& x3, double a, double b, double c, 
     double p = -pow(b,2)/(3*pow(a,2))+c/a;
     double q = 2*pow(b,3)/(27*pow(a,3))-b*c/(3*pow(a,2))+d/a;
     double Q = pow(p/3,3)+pow(q/2,2);
-    double R = boost::math::sign(q)*sqrt(fabs(p)/3);
+    double R = sign(q)*sqrt(fabs(p)/3);
 
     // 1 корень
     double phi = 0;
@@ -75,6 +80,22 @@ int CubeSolve(double& x1, double& x2, double& x3, double a, double b, double c, 
     x2 = -2*R*cos(phi/3+2*M_PI/3)-b/(3*a);
     x3 = -2*R*cos(phi/3+4*M_PI/3)-b/(3*a);
     return 3;
+}
+
+void LeastSquares()
+{
+}
+
+template<class Point>
+double splineApproxPoint(QVector<Point> points, int first, int last, double Point::* pt, double Point::* pval, double t)
+{
+    if (last != first+3)
+        throw ErrorBase::create(QString("Expected last=%1, but actual last=%2")
+            .arg(first+3).arg(last));
+
+
+
+    return 0;
 }
 
 // -----------------------------------------------------------------------------------------------------------
@@ -114,7 +135,7 @@ template<class Func> bool DichotomNewtonSolve(Func func, double& x, double x1, d
     double f2 = func.f(x2);
 
     // test Dichotom condition
-    if (boost::math::sign(f1*f2) > 0)
+    if (sign(f1*f2) > 0)
         return false;
 
     int splits_count = 0;
@@ -137,7 +158,7 @@ template<class Func> bool DichotomNewtonSolve(Func func, double& x, double x1, d
 
         // split interval
         double f3 = func.f(x3);
-        if (boost::math::sign(f1*f3) <= 0)
+        if (sign(f1*f3) <= 0)
         {
             x2 = x3;
             f2 = f3;
@@ -277,17 +298,20 @@ void Detail::calcContext(QSharedPointer<Geom> prevGeom[eDegCount], bool calc_s)
     m_geom[eDeg45]->calcContext(prevGeom, calc_s);
 }
 
+void Detail::recalc_r_max()
+{
+    m_geom[eDeg0]->recalc_r_max();
+    m_geom[eDeg45]->recalc_r_max();
+}
+
 // -----------------------------------------------------------------------------------------------------------
 // Point
 // -----------------------------------------------------------------------------------------------------------
-GeomsPoint::GeomsPoint()
+void GeomsPoint::init(Geom* geom, double s)
 {
-    throw ErrorBase::create(QString("GeomsPoint() is invalid constructor"));
-}
+    m_geom = geom;
+    m_s = s;
 
-GeomsPoint::GeomsPoint(Geom* geom, double s)
-    : m_geom(geom), m_s(s)
-{
     m_v = m_r = m_h = m_alpha = m_epsilon_phi = m_epsilon_i =
           m_sigma_s = m_sigma_r = m_sigma_phi = m_s_expr = m_omega_e = 0;
 }
@@ -460,6 +484,26 @@ void Geom::recalc_max_dh()
         double max_dh = h_x(alpha_xx, AB) - m_h;
         m_max_dh = qMin(m_max_dh, max_dh);
     }
+}
+
+void Geom::recalc_r_max()
+{
+    double AB_max = r_max()-m_r_1+m_AB;
+    double s_max = s_0() + AB_max/m_AB*(m_s_1-s_0());
+    double v_max = M_PI*AB_max/(3*cos(m_alpha)) * ( AB_max*(s_0()+2*s_max) + 3*(s_0()+s_max)*(r_2()-r_kp()) +
+        sin(m_alpha)*((s_0()+s_max)*(3*r_kp()+2*s_0())-pow(s_max,2)) );
+
+    int curr = m_V6_i_max+1;
+    while (curr<=m_V5_i_max && m_points[curr].m_v > v_max)
+        curr++;
+    int first = curr-2;
+    int last = first+3;
+    if (first < m_V6_i_max+1 || m_V5_i_max < last)
+        throw ErrorBase::create(QString("Expected %1<=first<last<=%2, but actual first=%3, last=%4")
+            .arg(m_V6_i_max+1).arg(m_V5_i_max).arg(first).arg(last));
+
+    GeomsPoint pt;
+    pt.m_v = splineApproxPoint(m_points, first, last, &GeomsPoint::m_r, &GeomsPoint::m_v, r_max());
 }
 
 // -----------------------------------------------------------------------------------------------------------
@@ -716,11 +760,9 @@ void Geom::calcContext(QSharedPointer<Geom> prevGeom[eDegCount], bool calc_s)
             pt.m_sigma_r = pt_prev_r.m_sigma_r - (pt.m_r-pt_prev_r.m_r)/pt_prev_r.m_r*
                     (pt_prev_r.m_sigma_r*(1+f) - pt_prev_r.m_sigma_phi);
         else if (i <= m_V6_i_max+1)
-        {
             pt.m_sigma_r = pt_prev_r.m_sigma_r*(1 - (pt.m_r-pt_prev_h.m_r)/pt_prev_h.m_r*f) +
                 (pt.m_alpha - pt_prev_r.m_alpha)*(pt_prev_r.m_sigma_r*(cos(pt_prev_r.m_alpha)/(a-sin(pt_prev_r.m_alpha))+mu()) -
                 pt_prev_r.m_sigma_phi*(cos(pt_prev_r.m_alpha)+mu()*sin(pt_prev_r.m_alpha))/(a-sin(pt_prev_r.m_alpha)));
-        }
         else if (i <= m_V5_i_max+1)
             pt.m_sigma_r = pt_prev_r.m_sigma_r - (pt.m_r-pt_prev_r.m_r)/pt_prev_r.m_r*
                 (pt_prev_r.m_sigma_r*(1+f) - pt_prev_r.m_sigma_phi);
@@ -826,6 +868,7 @@ void Process::exec()
         // ...
         m_prev_geoms << GeomPair(m_detail->geom(eDeg0)->clone(), m_detail->geom(eDeg45)->clone());
     }
+    m_detail->recalc_r_max();
 }
 
 // -----------------------------------------------------------------------------------------------------------
