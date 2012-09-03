@@ -1,6 +1,6 @@
 #INCLUDEPATH *= /usr/include/c++/4.6
 
-DEV_PATH = /home/andyk/development
+DEV_PATH = $${PWD}/..
 INCLUDEPATH *= $${DEV_PATH}/boost
 DEPENDPATH  *= $${DEV_PATH}/boost
 #LIBS        *= -L$${DEV_PATH}/boost/stage/lib -lboost_system
@@ -14,9 +14,9 @@ DEPENDPATH  *= $${DEV_PATH}/andyk
 LIBS        *= -L$${DEV_PATH}/andyk/lib -landyk-core
 #LIBS        *= -L$${DEV_PATH}/andyk/lib -landyk-serialization
 
-INCLUDEPATH *= $${DEV_PATH}/qwt/src
-DEPENDPATH  *= $${DEV_PATH}/qwt/src
-LIBS        *= -L$${DEV_PATH}/qwt/lib -lqwt
+#INCLUDEPATH *= $${DEV_PATH}/qwt/src
+#DEPENDPATH  *= $${DEV_PATH}/qwt/src
+#LIBS        *= -L$${DEV_PATH}/qwt/lib -lqwt
 
 #INCLUDEPATH *= /home/andyk/development/qt/src/testlib
 #DEPENDPATH  *= /home/andyk/development/qt/src/testlib
@@ -46,5 +46,5 @@ HEADERS += deform_app.h \
     detail.h
 
 OTHER_FILES += read_me.txt
-DESTDIR = /home/andyk/development/deform
+DESTDIR  = ../../deform
 TARGET = deform

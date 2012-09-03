@@ -1,10 +1,6 @@
 #include "deform_app.h"
 #include "deform_dlg.h"
 
-#include <fstream>
-#include <iomanip>
-#include <locale>
-
 // -----------------------------------------------------------------------------------------------------------
 // DeformApp
 // -----------------------------------------------------------------------------------------------------------
@@ -119,7 +115,6 @@ int main(int argc, char* argv[])
     // locale
     QLocale::setDefault(QLocale(QLocale::Russian, QLocale::RussianFederation));
     QTextCodec::setCodecForCStrings(QTextCodec::codecForName("UTF-8"));
-    std::locale::global(std::locale("ru_RU.UTF-8"));
 
 #ifndef TESTING
     DeformApp app(argc, argv);

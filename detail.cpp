@@ -1,11 +1,8 @@
 #include "detail.h"
 #include "deform_app.h"
 #include <boost/math/special_functions/sign.hpp>
-#include <boost/math/special_functions/sign.hpp>
-#include <boost/numeric/ublas/matrix.hpp>
-
-using namespace boost::math;
-//using namespace boost::ublas;
+#include <boost/math/special_functions/asinh.hpp>
+#include <boost/math/special_functions/acosh.hpp>
 
 // ----------------------------------------------------------------------------------------------------------
 // Решение квадратного уравнения a*x^2+b*x+c=0, если a,b,c - числа с плав. точкой.
@@ -57,19 +54,19 @@ int CubeSolve(double& x1, double& x2, double& x3, double a, double b, double c, 
     double p = -pow(b,2)/(3*pow(a,2))+c/a;
     double q = 2*pow(b,3)/(27*pow(a,3))-b*c/(3*pow(a,2))+d/a;
     double Q = pow(p/3,3)+pow(q/2,2);
-    double R = sign(q)*sqrt(fabs(p)/3);
+    double R = boost::math::sign(q)*sqrt(fabs(p)/3);
 
     // 1 корень
     double phi = 0;
     if (p > 0)
     {
-        phi = asinh(q/(2*pow(R,3)));
+        phi = boost::math::asinh(q/(2*pow(R,3)));
         x1 = -2*R*sinh(phi/3)-b/(3*a);
         return 1;
     }
     if (Q > 0)
     {
-        phi = acosh(q/(2*pow(R,3)));
+        phi = boost::math::acosh(q/(2*pow(R,3)));
         x1 = -2*R*cosh(phi/3)-b/(3*a);
         return 1;
     }
@@ -135,7 +132,7 @@ template<class Func> bool DichotomNewtonSolve(Func func, double& x, double x1, d
     double f2 = func.f(x2);
 
     // test Dichotom condition
-    if (sign(f1*f2) > 0)
+    if (boost::math::sign(f1*f2) > 0)
         return false;
 
     int splits_count = 0;
@@ -158,7 +155,7 @@ template<class Func> bool DichotomNewtonSolve(Func func, double& x, double x1, d
 
         // split interval
         double f3 = func.f(x3);
-        if (sign(f1*f3) <= 0)
+        if (boost::math::sign(f1*f3) <= 0)
         {
             x2 = x3;
             f2 = f3;
